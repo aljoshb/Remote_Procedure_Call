@@ -10,4 +10,4 @@ rpc: rpc.c
 	$(CC) -o $@ $^
 
 clean:
-	rm -f *.o
+	rm -f *.o binder rpc
