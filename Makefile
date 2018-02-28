@@ -1,13 +1,16 @@
 CC= gcc
 CFLAGS= -g -Wall
 
-all: binder rpc
+all: binder rpc.a
 
 binder: binder.c
 	$(CC) -o $@ $^
 
-rpc: rpc.c
-	$(CC) -o $@ $^
+rpc.o: rpc.c
+	$(CC) -c -o $@ $^
+
+rpc.a: rpc.o
+	ar rcs $@ $^
 
 clean:
-	rm -f *.o binder rpc
+	rm -f *.o *.a binder
