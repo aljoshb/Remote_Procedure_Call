@@ -1,7 +1,7 @@
 CC= gcc
 CFLAGS= -g -Wall
 
-all: binder rpc.a
+all: binder librpc.a
 
 binder: binder.c
 	$(CC) -o $@ $^
@@ -9,7 +9,7 @@ binder: binder.c
 rpc.o: rpc.c
 	$(CC) -c -o $@ $^
 
-rpc.a: rpc.o
+librpc.a: rpc.o
 	ar rcs $@ $^
 
 clean:
