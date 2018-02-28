@@ -1,9 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <signal.h>
 
 #include "rpc.h"
 #include "binder.h"
+
+#define BACKLOG 100
 
 int main() {
 	
@@ -38,7 +48,7 @@ int main() {
 		}
 
 		// Bind
-		if (::bind(serverSocket, goodres->ai_addr, goodres->ai_addrlen) == -1) {
+		if (bind(binderSocket, goodres->ai_addr, goodres->ai_addrlen) == -1) {
 			close(binderSocket);
 //			perror("server: bind");
 			continue;
@@ -67,12 +77,12 @@ int main() {
 //	    perror("getsockname");
 	}
 	else {
-		char namGe[1024];
-		int r = gethostname(namGe, 1024);
+		char getBinderHostName[1024];
+		int r = gethostname(getBinderHostName, 1024);
 		if (r==-1) {
 //			perror("gethostname");
 		}
-		cout << "BINDER_ADDRESS "<< namGe << endl;
+		printf("BINDER_ADDRESS %s\n",getBinderHostName);
 		printf("BINDER_PORT %d\n", ntohs(binderAddress.sin_port));
 
 	}
