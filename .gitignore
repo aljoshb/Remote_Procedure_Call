@@ -2,3 +2,5 @@
 *.a
 .DS_Store
 binder
+client
+server
