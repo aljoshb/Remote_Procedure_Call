@@ -8,3 +8,7 @@ This assignment was completed to meet the requirements of CS454/654. The purpose
 
 - `jb2alawo` Joshua Alawode 
 - `j327liu` JK Liu
+
+## Reference
+
+Some of the code used in this project was inspired by and taken from [Beej's Guide to Network Programming Using Internet Sockets](http://beej.us).
