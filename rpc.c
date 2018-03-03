@@ -42,7 +42,7 @@ int rpcExecute() { /*Jk*/
 		// return results to client
 	}
 
-
+	return 0;
 }
 int rpcTerminate() { /*Jk*/
 	const char *hostname = getenv("BINDER_ADDRESS");

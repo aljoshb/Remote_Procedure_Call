@@ -159,8 +159,18 @@ int main() {
 					if (messageType == TERMINATE) {
 
 						// Inform all the servers
-
-
+						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
+							if (FD_ISSET(i, &read_fds) && i != binderSocket) {
+								int sendMessage = send(i, &messageType, sizeof(messageType), 0);
+								if (sendMessage!=sizeof(messageType)) {
+									int justInCase=sendMessage;
+									while (justInCase<=sizeof(messageType)) {
+										sendMessage = send(i, &messageType+sendMessage, sizeof(messageType), 0);
+										justInCase+=sendMessage;
+									}
+								}
+							}
+						}
 						// Exit
 						break;
 
@@ -197,4 +207,7 @@ int main() {
 		}
 
 	}
+
+	// Close binder socket
+	close(binderSocket);
 }
