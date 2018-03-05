@@ -21,6 +21,10 @@ int fdServerWithBinder = -1;
 const char *binderIP;
 const char *binderPort;
 
+/* Server location info */
+char getServerHostName[1024];
+uint32_t serverPort;
+
 int rpcInit() { /*Josh*/
 	
 	/* First Init: Server socket for accepting connections from clients */
@@ -71,6 +75,22 @@ int rpcInit() { /*Josh*/
 	/* Free res */
 	freeaddrinfo(res);
 
+	/* Set the server location info */
+	struct sockaddr_in serverAddress;
+	socklen_t len = sizeof(serverAddress);
+	if (getsockname(fdServerWithClient, (struct sockaddr *)&serverAddress, &len) == -1) {
+	    perror("error on getsockname");
+	}
+	else {
+		int r = gethostname(getServerHostName, 1024);
+		if (r==-1) {
+			perror("error on gethostname");
+		}
+		serverPort = ntohs(serverAddress.sin_port);
+
+		printf("SERVER_ADDRESS %s\n",getServerHostName);
+		printf("SERVER_PORT %d\n", serverPort);
+	}
 
 	/* Second Init: Server socket connection for communication with binder*/
 
@@ -129,6 +149,12 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 }
 int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	
+	/* Call the binder and inform it that I have the function procedure called 'name' */
+
+
+	/* Associate the server skeleton with the name and list of args */
+
+
 	return 0;
 }
 int rpcExecute() { /*Jk*/
