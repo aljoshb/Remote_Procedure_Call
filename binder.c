@@ -17,7 +17,7 @@
 
 int main() {
 	
-	/* Server Socket (some code gotten from http://beej.us tutorial) */
+	/* Binder Socket (some code gotten from http://beej.us tutorial) */
 	int error;
 	int binderSocket;
 	struct addrinfo hints;
@@ -69,7 +69,7 @@ int main() {
 		fprintf(stderr, "error while trying to listen\n");
 	}
 
-	/* Get the Server's port number and IP */
+	/* Get the Binder's port number and IP */
 	struct sockaddr_in binderAddress;
 	socklen_t len = sizeof(binderAddress);
 	if (getsockname(binderSocket, (struct sockaddr *)&binderAddress, &len) == -1) {
