@@ -12,6 +12,7 @@
 
 #include "rpc.h"
 #include "binder.h"
+#include "communication_functions.h"
 
 #define BACKLOG 100
 
@@ -148,27 +149,27 @@ int main() {
 				else { // Received data from an existing connection
 
 					// First, get the length of the incoming message
-					nbytes = recv(i, &messageLength, sizeof(messageLength), 0);
+					receiveInt(i, &messageLength, sizeof(messageLength), 0);
 
 					// Allocate the appropriate memory and get the message
 					char *message;
 					message = (char*) malloc (messageLength);
 
 					// Next, get the type of the incoming message
-					nbytes = recv(i, &messageType, sizeof(messageType), 0);
+					receiveInt(i, &messageType, sizeof(messageType), 0);
+
 					if (messageType == TERMINATE) {
 
 						// Inform all the servers
 						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
 							if (FD_ISSET(i, &read_fds) && i != binderSocket) {
-								int sendMessage = send(i, &messageType, sizeof(messageType), 0);
-								if (sendMessage!=sizeof(messageType)) {
-									int justInCase=sendMessage;
-									while (justInCase<=sizeof(messageType)) {
-										sendMessage = send(i, &messageType+sendMessage, sizeof(messageType), 0);
-										justInCase+=sendMessage;
-									}
-								}
+								
+								//Send the length
+								sendInt(i, &messageLength, sizeof(messageLength), 0);
+
+								// Send the message (Just the type: TERMINATE)
+								sendInt(i, &messageType, sizeof(messageType), 0);
+
 							}
 						}
 						// Exit

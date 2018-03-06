@@ -4,12 +4,15 @@ CFLAGS= -g -Wall
 all: binder librpc.a
 
 binder: binder.c
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ communication_functions.c
+
+communication_functions.o: communication_functions.c
+	$(CC) -c -o $@ $^
 
 rpc.o: rpc.c
 	$(CC) -c -o $@ $^
 
-librpc.a: rpc.o
+librpc.a: rpc.o communication_functions.o
 	ar rcs $@ $^
 
 test:

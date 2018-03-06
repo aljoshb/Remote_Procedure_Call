@@ -12,14 +12,11 @@
 
 #include "rpc.h"
 #include "binder.h"
+#include "communication_functions.h"
 
 /* Server socket file descriptors with client and binder */
 int fdServerWithClient = -1;
 int fdServerWithBinder = -1;
-
-/* Binder location info */
-const char *binderIP;
-const char *binderPort;
 
 /* Server location info */
 char getServerHostName[1024];
@@ -27,7 +24,7 @@ uint32_t serverPort;
 
 int rpcInit() { /*Josh*/
 	
-	/* First Init: Server socket for accepting connections from clients */
+	/* First Init Step: Server socket for accepting connections from clients */
 
 	int error;
 	struct addrinfo hints;
@@ -88,71 +85,129 @@ int rpcInit() { /*Josh*/
 		}
 		serverPort = ntohs(serverAddress.sin_port);
 
-		printf("SERVER_ADDRESS %s\n",getServerHostName);
-		printf("SERVER_PORT %d\n", serverPort);
+		// printf("SERVER_ADDRESS %s\n",getServerHostName);
+		// printf("SERVER_PORT %d\n", serverPort);
 	}
 
-	/* Second Init: Server socket connection for communication with binder*/
+	/* Second Init Step: Server socket connection for communication with binder*/
 
 	/* Get the binder info from env variables */
-	binderIP = getenv("BINDER_ADDRESS");
-	binderPort = getenv("BINDER_PORT");
+	const char *binderIP = getenv("BINDER_ADDRESS");
+	const char *binderPort = getenv("BINDER_PORT");
 
-	/* Set up socket and connect to binder */
-	int error2;
-	struct addrinfo hints2;
-	struct addrinfo *res2, *goodres2;
-
-	memset(&hints2, 0, sizeof hints2);
-	hints2.ai_family = AF_UNSPEC;
-	hints2.ai_socktype = SOCK_STREAM;
-	hints2.ai_flags = AI_PASSIVE;
-
-	/* Get the server address information and pass it to the socket function */
-	error = getaddrinfo(binderIP, binderPort, &hints2, &res2);
-	if (error2) {
-		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(error));
-		exit(1);
-	}
-	/* Find the valid entries and make the socket */
-	for (goodres2 = res2; goodres2 != NULL; goodres2 =goodres2->ai_next) {
-
-		// Socket
-		fdServerWithBinder = socket(goodres2->ai_family, goodres2->ai_socktype, goodres2->ai_protocol);
-		if (fdServerWithBinder<0) { // i.e. not -1
-			// Not found yet!
-			perror("error on creating socket to connect to the binder");
-			continue;
-		}
-
-		// Connect
-		if (connect(fdServerWithBinder, goodres2->ai_addr, goodres2->ai_addrlen) == -1) {
-			close(fdServerWithBinder);
-			perror("error on connecting to the binder");
-			continue;
-		}
-		break;
-	}
+	fdServerWithBinder = connection(binderIP, binderPort);
 	if (fdServerWithBinder<0) { // If we come out of the loop and still not found
 		fprintf(stderr, "no valid socket was found\n");
 		return -1;
 	}
 
-	/* Free res2 */
-	freeaddrinfo(res2);
-
 	return 0;
 }
+
 int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
+	/* Create a connection to the binder */
+
+	const char *binderIP = getenv("BINDER_ADDRESS");
+	const char *binderPort = getenv("BINDER_PORT");
+
+	/* Set up socket and connect to binder */
+	int fdClientWithBinder = connection(binderIP, binderPort);
+	if (fdClientWithBinder<0) {
+		fprintf(stderr, "unable to connect with the binder\n");
+		return -1;
+	}
+
+	/* Contact the binder to get the location of a server that has 'name' */
+
+	uint32_t messageLenBinder;
+	uint32_t messageTypeBinder = LOC_REQUEST;
+
+	// Send the message length
+	sendInt(fdClientWithBinder, &messageLenBinder, sizeof(messageLenBinder), 0);
+	
+	// Send the message type
+	sendInt(fdClientWithBinder, &messageTypeBinder, sizeof(messageTypeBinder), 0);
+
+	// Send the actual message
+
+	/* Receive response back from the binder */
+
+	// Get the length
+
+	// Get the message type
+
+	// Set the expected server info
+
+	// Then create a socket connection to the server using the ip and port info gotten from the binder
+	int fdClientWithServer; // =connection(serverIP, serverPort);
+	if (fdClientWithServer<0) {
+		fprintf(stderr, "unable to connect with the binder\n");
+		return -1;
+	}
+
+	// Then close the socket with the binder
+	close(fdClientWithBinder);
+
+	/* Now contact the server gotten from the binder */
+
+	uint32_t messageLenServer;
+	uint32_t messageTypeServer = EXECUTE;
+
+	// Send the length
+	sendInt(fdClientWithServer, &messageLenServer, sizeof(messageLenServer), 0);
+
+	// Send the message type
+	sendInt(fdClientWithServer, &messageTypeServer, sizeof(messageTypeServer), 0);
+
+	// Send the message
+
+	/* Receive response back from the Server */
+
+	// Get the length
+
+	// Get the message type
+
+	// Get the message
+
+	
 	return 0;
 }
+
 int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	
-	/* Call the binder and inform it that I have the function procedure called 'name' */
+	/* First Register Step: Call the binder and inform it that I have the function procedure called 'name' */
+	
+	uint32_t messageLength;
+	uint32_t messageType = REGISTER;
+
+	// Set the message length
+		// sizeof(array) does not work on arrays passed into a function,
+		// so how do I get the length argTypes, then the length of the message?
+
+	// Send the length
+	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0);
+
+	// Send the type
+	sendInt(fdServerWithBinder, &messageType, sizeof(messageType), 0);
+
+	// Send the message
+		// How to concat the name and argTypes array into one message?
 
 
-	/* Associate the server skeleton with the name and list of args */
+	/* Get the response back from the binder */ 
+	uint32_t receiveLength;
+	uint32_t receiveType;
+
+	// Get the length
+	receiveInt(fdServerWithBinder, &receiveLength, sizeof(receiveLength), 0);
+
+	// Get the message type
+	receiveInt(fdServerWithBinder, &receiveType, sizeof(receiveType), 0);
+
+	// Get the message
+
+	/* Second Register Step: Associate the server skeleton with the name and list of args */
 
 
 	return 0;
