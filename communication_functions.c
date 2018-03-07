@@ -19,13 +19,13 @@
 int sendInt(int socketfd, uint32_t *numToSend, size_t length, int flags) {
 
 	/* First send attempt */
-	int sendLength = send(socketfd, &numToSend, length, 0);
+	int sendLength = send(socketfd, numToSend, length, 0);
 
 	/* If full message was not sent in first send attempt */
 	if (sendLength!=length) {
 		int justInCase=sendLength;
 		while (justInCase<=length) {
-			sendLength = send(socketfd, &numToSend+sendLength, length-sendLength, 0);
+			sendLength = send(socketfd, numToSend+sendLength, length-sendLength, 0);
 			justInCase+=sendLength;
 		}
 	}
@@ -37,7 +37,7 @@ int sendInt(int socketfd, uint32_t *numToSend, size_t length, int flags) {
 int receiveInt(int socketfd, uint32_t *numToReceive, size_t length, int flags) {
 
 	/* First receive attempt */
-	int nbytes = recv(socketfd, &numToReceive, length, 0);
+	int nbytes = recv(socketfd, numToReceive, length, 0);
 
 	/* Encountered an error while trying to receive */
 	if (nbytes<=0) {
@@ -48,7 +48,7 @@ int receiveInt(int socketfd, uint32_t *numToReceive, size_t length, int flags) {
 	else if (nbytes<length) {
 		int justInCase=nbytes;
 		while (justInCase<=length) {
-			nbytes = recv(socketfd, &numToReceive+nbytes, length-nbytes, 0);
+			nbytes = recv(socketfd, numToReceive+nbytes, length-nbytes, 0);
 			justInCase+=nbytes;
 		}
 	}
