@@ -212,6 +212,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 
 	return 0;
 }
+
 int rpcExecute() { /*Jk*/
 	// main server loop
 	
@@ -237,11 +238,26 @@ int rpcExecute() { /*Jk*/
 
 	return 0;
 }
+
 int rpcTerminate() { /*Jk*/
-	const char *hostname = getenv("BINDER_ADDRESS");
-	const char *portStr = getenv("BINDER_PORT");
+	const char *binderIP = getenv("BINDER_ADDRESS");
+	const char *binderPort = getenv("BINDER_PORT");
 
 	// client passes request to binder
+	int fdClientWithBinder = connection(binderIP, binderPort);
+	if (fdClientWithBinder < 0) {
+		fprintf(stderr, "Unable to connect to binder\n");
+		return -1;
+	}
+
+	uint32_t messageLenBinder;
+	uint32_t messageTypeBinder = TERMINATE;
+
+	// Send the message length
+	sendInt(fdClientWithBinder, &messageLenBinder, sizeof(messageLenBinder), 0);
+	
+	// Send the message type
+	sendInt(fdClientWithBinder, &messageTypeBinder, sizeof(messageTypeBinder), 0);
 
 	return 0;
 }
