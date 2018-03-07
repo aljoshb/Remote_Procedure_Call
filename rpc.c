@@ -14,13 +14,16 @@
 #include "binder.h"
 #include "communication_functions.h"
 
-/* Server socket file descriptors with client and binder */
+/* Server socket file descriptors with the client and binder */
 int fdServerWithClient = -1;
 int fdServerWithBinder = -1;
 
 /* Server location info */
-char getServerHostName[1024];
+char getServerHostName[256];
 uint32_t serverPort;
+
+/* Client socket file descriptors with the binder */
+int fdClientWithBinder = -1;
 
 int rpcInit() { /*Josh*/
 	
@@ -107,12 +110,11 @@ int rpcInit() { /*Josh*/
 int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 	/* Create a connection to the binder */
-
-	const char *binderIP = getenv("BINDER_ADDRESS");
-	const char *binderPort = getenv("BINDER_PORT");
-
-	/* Set up socket and connect to binder */
-	int fdClientWithBinder = connection(binderIP, binderPort);
+	if (fdClientWithBinder == -1) { // A connection hasn't been created yet. Avoid creating multiple connections to the same binder.
+		const char *binderIP = getenv("BINDER_ADDRESS");
+		const char *binderPort = getenv("BINDER_PORT");
+		fdClientWithBinder = connection(binderIP, binderPort);
+	}
 	if (fdClientWithBinder<0) {
 		fprintf(stderr, "unable to connect with the binder\n");
 		return -1;

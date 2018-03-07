@@ -77,8 +77,8 @@ int main() {
 	    perror("error on getsockname");
 	}
 	else {
-		char getBinderHostName[1024];
-		int r = gethostname(getBinderHostName, 1024);
+		char getBinderHostName[256];
+		int r = gethostname(getBinderHostName, 256);
 		if (r==-1) {
 			perror("error on gethostname");
 		}
