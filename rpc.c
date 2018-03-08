@@ -254,28 +254,131 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 }
 
 int rpcExecute() { /*Jk*/
+	const int BACKLOG = 20;
+
+	// listen on the initialized sockets
+	if (listen(fdServerWithClient, BACKLOG) == -1) {
+		fprintf(stderr, "error while trying to listen\n");
+	}
+	
+	if (listen(fdServerWithBinder, BACKLOG) == -1) {
+		fprintf(stderr, "error while trying to listen\n");
+	}
+
+	// set up for select
+	fd_set master_fd;
+	fd_set read_fds;
+	int fdmax;
+	int newfd;
+	struct sockaddr_storage remoteaddr;
+	socklen_t addrlen;
+	int ret;
+
+	/* Keep track of the number of bytes received so far */
+	int nbytes;
+
+	FD_ZERO(&master_fd);
+	FD_ZERO(&read_fds);
+
+	// add sockets to the listened set
+	FD_SET(fdServerWithClient, &master_fd);
+	FD_SET(fdServerWithBinder, &master_fd);
+
+	// max file descriptor is the largest of the socket fds
+	fdmax = fdServerWithClient > fdServerWithBinder ? fdServerWithClient : fdServerWithBinder;
+
+	/* Store the incoming message length and type */
+	uint32_t messageLength;
+	uint32_t messageType;
+
+	int isRunning = 1;
+
 	// main server loop
-	
-	int messageType = 0;
+	while (isRunning) {
+		// At the start of each iteration copy master_fd into read_fds
+		read_fds = master_fd;
 
-	// handle termination
-	if (messageType == TERMINATE) {
-		const char *hostname = getenv("BINDER_ADDRESS");
-		const char *portStr = getenv("BINDER_PORT");
-		
-		// check if termination from binder
-		
+		// select() blocks until a new connection request or message on current connection
+		ret = select(fdmax+1, &read_fds, NULL, NULL, NULL);
+		if (ret ==-1) {
+			perror("error on select()'s return");
+		}
 
-		// binder requested termination
-		return 0;
+		// Once select returns, loop through the file descriptor list
+		for (int i = 0; i <= fdmax; i++) {
+			if (FD_ISSET(i, &read_fds)) {
+				if (i == fdServerWithClient || i == fdServerWithBinder) { // Received a new connection request
+					addrlen = sizeof remoteaddr;
+
+					if (i == fdServerWithClient) {
+						newfd = accept(fdServerWithClient, (struct sockaddr *)&remoteaddr, &addrlen);
+					}
+
+					else if (i == fdServerWithBinder) {
+						newfd = accept(fdServerWithBinder, (struct sockaddr *)&remoteaddr, &addrlen);
+					}
+					
+					if (newfd == -1) {
+						perror("error when accepting new connection");
+					}
+
+					else {
+						// Add the new client or server file descriptor to the list
+						FD_SET(newfd, &master_fd);
+						if (newfd>fdmax) {
+							// Then its the new fdmax
+							fdmax = newfd;
+						}
+					}
+				}
+
+				else { // Received data from an existing connection
+					// First, get the length of the incoming message
+					receiveInt(i, &messageLength, sizeof(messageLength), 0);
+
+					// Next, get the type of the incoming message
+					receiveInt(i, &messageType, sizeof(messageType), 0);
+
+					// handle termination
+					if (messageType == TERMINATE) {
+						// check if termination from binder
+						const char *hostname = getenv("BINDER_ADDRESS");
+						const char *portStr = getenv("BINDER_PORT");
+						
+						isRunning = 0;
+						break;
+					}
+
+					// forward request to skeleton
+					else if (messageType == EXECUTE) {
+						// Allocate the appropriate memory and get the message
+						char *message;
+						message = (char*) malloc(messageLength);
+
+						nbytes = recv(i, message, messageLength, 0);
+						if (nbytes>=1 && nbytes<messageLength) { // If full message not received
+							int justInCase=nbytes;
+							while (justInCase<=messageLength) {
+								nbytes = recv(i, message+nbytes, messageLength, 0);
+								justInCase+=nbytes;
+							}
+						}
+
+						// If error or no data, close socket with this client or server
+						if (nbytes <= 0) {
+							close(i);
+							FD_CLR(i, &master_fd);
+						}
+						else {
+
+						}
+						free(message);
+					}
+				}
+			}
+		}
 	}
-
-	// forward request to skeleton
-	else if (messageType == EXECUTE) {
-	
-		// return results to client
-	}
-
+		
 	return 0;
 }
 
