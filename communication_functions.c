@@ -57,14 +57,43 @@ int receiveInt(int socketfd, uint32_t *numToReceive, size_t length, int flags) {
 }
 
 /* This will be used to send the actual message */
-int sendMessage(int socketfd, void *messageToSend, size_t length, int flags) {
+int sendMessage(int socketfd, char *messageToSend, size_t length, int flags) {
+
+	/* First send attempt */
+	int sendLength = send(socketfd, messageToSend, length, 0);
+
+	/* If full message was not sent in first send attempt */
+	if (sendLength!=length) {
+		int justInCase=sendLength;
+		while (justInCase<=length) {
+			sendLength = send(socketfd, messageToSend+sendLength, length-sendLength, 0);
+			justInCase+=sendLength;
+		}
+	}
 
 	return 0;
 }
 
 /* This will be used to receive the actual message */
-int receiveMessage(int socketfd, void *messageToReceive, size_t length, int flags) {
+int receiveMessage(int socketfd, char *messageToReceive, size_t length, int flags) {
 
+	/* First receive attempt */
+	int nbytes = recv(socketfd, messageToReceive, length, 0);
+
+	/* Encountered an error while trying to receive */
+	if (nbytes<=0) {
+		printf("Error while trying to receive. Closing socket....\n");
+		close(socketfd);
+	}
+	/* If full message was not received in first receive attempt */
+	else if (nbytes<length) {
+		int justInCase=nbytes;
+		while (justInCase<=length) {
+			nbytes = recv(socketfd, messageToReceive+nbytes, length-nbytes, 0);
+			justInCase+=nbytes;
+		}
+	}
+	
 	return 0;
 }
 

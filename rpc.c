@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <vector>
 
 #include "rpc.h"
 #include "binder.h"
@@ -24,6 +25,7 @@ uint32_t serverPort;
 
 /* Client socket file descriptors with the binder */
 int fdClientWithBinder = -1;
+
 
 int rpcInit() { /*Josh*/
 	
@@ -125,13 +127,34 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 	uint32_t messageLenBinder;
 	uint32_t messageTypeBinder = LOC_REQUEST;
 
+	// Set the message length
+	int i=0;
+	int lengthOfargTypesArray;
+	while (true) {
+		if (*(argTypes+i) == 0) {
+			lengthOfargTypesArray = i+1;
+			break;
+		}
+		i++;
+	}
+	messageLenBinder = FUNCNAMELENGTH + lengthOfargTypesArray; // name+argTypes[]+args[]
+
+	// Prepare the message
+	char* message = (char*)malloc(messageLenBinder);
+	memset(message, 0, FUNCNAMELENGTH); // Pad with zeroes first
+	memcpy(message, name, strlen(name));
+	memcpy(message+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
+
 	// Send the message length
 	sendInt(fdClientWithBinder, &messageLenBinder, sizeof(messageLenBinder), 0);
 	
 	// Send the message type
 	sendInt(fdClientWithBinder, &messageTypeBinder, sizeof(messageTypeBinder), 0);
-
 	// Send the actual message
+	sendMessage(fdClientWithBinder, message, messageLenBinder, 0);
+
+	// Free message
+	free(message);
 
 	/* Receive response back from the binder */
 
@@ -147,9 +170,6 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		fprintf(stderr, "unable to connect with the binder\n");
 		return -1;
 	}
-
-	// Then close the socket with the binder
-	close(fdClientWithBinder);
 
 	/* Now contact the server gotten from the binder */
 
@@ -184,8 +204,24 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	uint32_t messageType = REGISTER;
 
 	// Set the message length
-		// sizeof(array) does not work on arrays passed into a function,
-		// so how do I get the length argTypes, then the length of the message?
+	int i=0;
+	int lengthOfargTypesArray;
+	while (true) {
+		if (*(argTypes+i) == 0) {
+			lengthOfargTypesArray = i+1;
+			break;
+		}
+		i++;
+	}
+	messageLength = SERVERIP + SERVERPORT + FUNCNAMELENGTH + lengthOfargTypesArray;
+
+	// Prepare the message
+	char* message = (char*)malloc(messageLength);
+	memset(message, 0, messageLength); // Pad with zeroes first
+	memcpy(message, getServerHostName, SERVERIP); // server ip
+	memcpy(message+SERVERIP, &serverPort, SERVERPORT); // server port
+	memcpy(message+SERVERIP+SERVERPORT, name, strlen(name)); // func name
+	memcpy(message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray); // argTypes array
 
 	// Send the length
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0);
@@ -194,12 +230,13 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	sendInt(fdServerWithBinder, &messageType, sizeof(messageType), 0);
 
 	// Send the message
-		// How to concat the name and argTypes array into one message?
+	sendMessage(fdServerWithClient, message, messageLength, 0);
 
 
 	/* Get the response back from the binder */ 
 	uint32_t receiveLength;
 	uint32_t receiveType;
+	char* registerResponse;
 
 	// Get the length
 	receiveInt(fdServerWithBinder, &receiveLength, sizeof(receiveLength), 0);
@@ -208,6 +245,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	receiveInt(fdServerWithBinder, &receiveType, sizeof(receiveType), 0);
 
 	// Get the message
+	receiveMessage(fdServerWithBinder, registerResponse, receiveLength, 0);
 
 	/* Second Register Step: Associate the server skeleton with the name and list of args */
 

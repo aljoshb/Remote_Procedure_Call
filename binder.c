@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <vector>
 
 #include "rpc.h"
 #include "binder.h"
@@ -112,6 +113,10 @@ int main() {
 	uint32_t messageLength;
 	uint32_t messageType;
 
+	/* Dictionary and vector to database 
+	 * 'dictionary< char* funcArgTypes, vector< struct serverIdentifier{char* ip, char* port} > >' 
+	 */
+
 	/* Binder runs forever, accepting connections and processing data until a termination message */
 	while (1) {
 
@@ -162,7 +167,7 @@ int main() {
 
 						// Inform all the servers
 						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
-							if (FD_ISSET(i, &read_fds) && i != binderSocket) {
+							if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
 								
 								//Send the length
 								sendInt(i, &messageLength, sizeof(messageLength), 0);
@@ -177,13 +182,56 @@ int main() {
 
 					}
 					else {
-						nbytes = recv(i, message, messageLength, 0);
-						if (nbytes>=1 && nbytes<messageLength) { // If full message not received
-							int justInCase=nbytes;
-							while (justInCase<=messageLength) {
-								nbytes = recv(i, message+nbytes, messageLength, 0);
-								justInCase+=nbytes;
+						// Get the message, either REGISTER or LOC_REQUEST
+						receiveMessage(i, message, messageLength, 0);
+
+						if (messageType == REGISTER) {
+
+							// Loop through the database to find the function name and argTypes combo
+							int added = -1;
+							int previouslyAdded = -1;
+							for (;;) {
+
+								if (1) { // Found
+									
+									// First check if this server has already registered this function and argTypes combo
+									// i.e. check if this server is already on the list of servers that can handle this function
+										// if so, update and set previouslyAdded = 1
+
+									// Update added
+									added = 1;
+									break;
+								}
 							}
+
+							// If we didn't find it, then it's a new function name and argTypes combo
+							if (added == -1) {
+								// Add the new function name and argTypes combo to the database
+
+								// Update added
+								added = 1;
+							}
+
+							// Respond to the server
+							if (previouslyAdded == 1 ) {
+								// Respond with REGISTER_SUCCESS as type and PREVIOUSLY_REGISTERED as message
+
+							}
+							else if (added ==1) {
+								// Respond with REGISTER_SUCCESS as type and NEW_REGISTRATION as message
+
+							}
+
+						}
+						else if (messageType == LOC_REQUEST) {
+
+							// Get the function name and argTypes array
+							char *funcName = (char*)malloc(FUNCNAMELENGTH);
+							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
+							memcpy(funcName, message, FUNCNAMELENGTH);
+							memcpy(argTypes, message+FUNCNAMELENGTH, messageLength-FUNCNAMELENGTH);
+
+							// Find the ip address and port number of a server that can service the client's request
 
 						}
 

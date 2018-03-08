@@ -3,6 +3,12 @@
 extern "C" {
 #endif
 
+/* Struct for storing the server info */
+struct serverIdentifier {
+	char *serverIP;
+	char *serverPort;
+};
+
 /* Message types */
 
 #define REGISTER          1
@@ -24,6 +30,11 @@ extern "C" {
 
 #define NEW_REGISTRATION   11
 #define PREVIOUSLY_REGISTERED 12
+
+/* Max length of function name, server ip and port */
+#define FUNCNAMELENGTH 65
+#define SERVERIP 256
+#define SERVERPORT 4
 
 #ifdef __cplusplus
 }
