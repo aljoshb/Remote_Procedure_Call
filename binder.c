@@ -10,6 +10,11 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <vector>
+#include <map>
+#include <cstring>
+#include <string>
+#include <sstream>
+#include <iostream>
 
 #include "rpc.h"
 #include "binder.h"
@@ -112,10 +117,10 @@ int main() {
 	/* Store the incoming message length and type */
 	uint32_t messageLength;
 	uint32_t messageType;
+	int lastFuncAdded=0;
 
-	/* Dictionary and vector to database 
-	 * 'dictionary< char* funcArgTypes, vector< struct serverIdentifier{char* ip, char* port} > >' 
-	 */
+	/* Dictionary and vector to database */
+	std::map<std::string, std::vector<std::string> > binderDatabaseStr;
 
 	/* Binder runs forever, accepting connections and processing data until a termination message */
 	while (1) {
@@ -186,28 +191,60 @@ int main() {
 						receiveMessage(i, message, messageLength, 0);
 
 						if (messageType == REGISTER) {
+							// Set the server ip, port, function name and argTypes array 
+							char* newServerHostName=(char*)malloc(SERVERIP);
+							uint32_t newServerPort;
+							char *funcName = (char*)malloc(FUNCNAMELENGTH);
+							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
+							int lengthOfargTypesArray = messageLength-(SERVERIP+SERVERPORT+FUNCNAMELENGTH);
+							
+							memcpy(newServerHostName, message, SERVERIP); // server ip
+							memcpy(&newServerPort, message+SERVERIP, SERVERPORT); // server port
+							memcpy(funcName, message+SERVERIP+SERVERPORT, FUNCNAMELENGTH); // func name
+							memcpy(argTypes, message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, lengthOfargTypesArray); // argTypes array
 
-							// Loop through the database to find the function name and argTypes combo
+							// Create the funcName and argTypes pair for the dictionary. Store each funcName and argTypes pair as an int
+							char* newFuncNameargTypes = (char*)malloc(FUNCNAMELENGTH+lengthOfargTypesArray);;
+							memcpy(newFuncNameargTypes, funcName, FUNCNAMELENGTH);
+							memcpy(newFuncNameargTypes+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
+							std::string newFuncNameargTypesStr(newFuncNameargTypes);
+							char *serverIden = (char*)malloc(SERVERIP+SERVERPORT);
+							memcpy(serverIden, newServerHostName, SERVERIP);
+							memcpy(serverIden+SERVERIP, &newServerPort, SERVERPORT);
+							std::string valueServerLoc(serverIden);
+
+							int funcID = -1;
 							int added = -1;
 							int previouslyAdded = -1;
-							for (;;) {
+							
+							//Check if the key newFuncNameargTypes already exists in the dictionary
+							if (binderDatabaseStr.count(newFuncNameargTypesStr)>0) {
+								// It exists. Check if this server has already been added to the list for this funcArgTypes combo
+								size_t size = 10;
+								for (int g=0;g<binderDatabaseStr[newFuncNameargTypesStr].size();g++) {
+									if (binderDatabaseStr[newFuncNameargTypesStr][g] == valueServerLoc) {
 
-								if (1) { // Found
-									
-									// First check if this server has already registered this function and argTypes combo
-									// i.e. check if this server is already on the list of servers that can handle this function
-										// if so, update and set previouslyAdded = 1
+										// Update it
+										binderDatabaseStr[newFuncNameargTypesStr][g] = valueServerLoc;
+										previouslyAdded = 1;
 
-									// Update added
-									added = 1;
-									break;
+										break;
+
+									}
 								}
+								if (!previouslyAdded) {
+									binderDatabaseStr[newFuncNameargTypesStr].push_back(valueServerLoc);
+								}
+
+								// Update added
+								added = 1;
 							}
-
-							// If we didn't find it, then it's a new function name and argTypes combo
-							if (added == -1) {
-								// Add the new function name and argTypes combo to the database
-
+							else {
+								// It doesn't exist, add it
+								std::vector <std::string> addThisValue;
+								addThisValue.push_back(valueServerLoc);
+								binderDatabaseStr[newFuncNameargTypesStr]= addThisValue;
+								
 								// Update added
 								added = 1;
 							}
@@ -222,17 +259,29 @@ int main() {
 
 							}
 
+							// Free
+							free(newServerHostName);
+							free(funcName);
+							free(argTypes);
+							free(newFuncNameargTypes);
+
 						}
 						else if (messageType == LOC_REQUEST) {
 
-							// Get the function name and argTypes array
+							// Set the function name and argTypes array
 							char *funcName = (char*)malloc(FUNCNAMELENGTH);
 							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
+							int lengthOfargTypesArray = messageLength-FUNCNAMELENGTH;
+							
 							memcpy(funcName, message, FUNCNAMELENGTH);
-							memcpy(argTypes, message+FUNCNAMELENGTH, messageLength-FUNCNAMELENGTH);
+							memcpy(argTypes, message+FUNCNAMELENGTH, lengthOfargTypesArray);
 
 							// Find the ip address and port number of a server that can service the client's request
 
+
+							// Free
+							free(funcName);
+							free(argTypes);
 						}
 
 						// If error or no data, close socket with this client or server

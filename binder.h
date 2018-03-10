@@ -3,14 +3,7 @@
 extern "C" {
 #endif
 
-/* Struct for storing the server info */
-struct serverIdentifier {
-	char *serverIP;
-	char *serverPort;
-};
-
 /* Message types */
-
 #define REGISTER          1
 #define REGISTER_SUCCESS  2
 #define REGISTER_FAILURE  3
@@ -23,11 +16,9 @@ struct serverIdentifier {
 #define TERMINATE		  10
 
 /* Errors */
-
 #define BINDER_NOT_FOUND  -2
 
 /* Warnings/Follow-up */
-
 #define NEW_REGISTRATION   11
 #define PREVIOUSLY_REGISTERED 12
 

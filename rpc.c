@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <vector>
+#include <map>
 
 #include "rpc.h"
 #include "binder.h"
@@ -20,7 +21,7 @@ int fdServerWithClient = -1;
 int fdServerWithBinder = -1;
 
 /* Server location info */
-char getServerHostName[256];
+char getServerHostName[SERVERIP];
 uint32_t serverPort;
 
 /* Client socket file descriptors with the binder */
@@ -84,7 +85,7 @@ int rpcInit() { /*Josh*/
 	    perror("error on getsockname");
 	}
 	else {
-		int r = gethostname(getServerHostName, 1024);
+		int r = gethostname(getServerHostName, SERVERIP);
 		if (r==-1) {
 			perror("error on gethostname");
 		}
@@ -236,7 +237,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	/* Get the response back from the binder */ 
 	uint32_t receiveLength;
 	uint32_t receiveType;
-	char* registerResponse;
+	char* registerResponseMessage;
 
 	// Get the length
 	receiveInt(fdServerWithBinder, &receiveLength, sizeof(receiveLength), 0);
@@ -245,10 +246,14 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	receiveInt(fdServerWithBinder, &receiveType, sizeof(receiveType), 0);
 
 	// Get the message
-	receiveMessage(fdServerWithBinder, registerResponse, receiveLength, 0);
+	receiveMessage(fdServerWithBinder, registerResponseMessage, receiveLength, 0);
 
 	/* Second Register Step: Associate the server skeleton with the name and list of args */
 
+
+	// Free
+	free(message);
+	free(registerResponseMessage);
 
 	return 0;
 }
