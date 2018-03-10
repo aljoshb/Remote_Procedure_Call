@@ -11,6 +11,10 @@
 #include <signal.h>
 #include <vector>
 #include <map>
+#include <cstring>
+#include <string>
+#include <sstream>
+#include <iostream>
 
 #include "rpc.h"
 #include "binder.h"
@@ -27,6 +31,8 @@ uint32_t serverPort;
 /* Client socket file descriptors with the binder */
 int fdClientWithBinder = -1;
 
+/* Store the registered function and its skeleton */
+std::map<std::string, skeleton> listOfRegisteredFuncArgTypes;
 
 int rpcInit() { /*Josh*/
 	
@@ -139,6 +145,7 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		i++;
 	}
 	messageLenBinder = FUNCNAMELENGTH + lengthOfargTypesArray; // name+argTypes[]+args[]
+	int totalLen = FUNCNAMELENGTH + (2*lengthOfargTypesArray) - 1;
 
 	// Prepare the message
 	char* message = (char*)malloc(messageLenBinder);
@@ -158,41 +165,90 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 	free(message);
 
 	/* Receive response back from the binder */
+	uint32_t binderResponseLen;
+	uint32_t binderResponseType;
+	char* binderPositiveResponse = (char*)malloc(SERVERIP+SERVERPORT);
+	uint32_t binderNegativeResponse;
 
 	// Get the length
+	receiveInt(fdClientWithBinder, &binderResponseLen, sizeof(binderResponseLen), 0);
 
 	// Get the message type
-
-	// Set the expected server info
-
-	// Then create a socket connection to the server using the ip and port info gotten from the binder
-	int fdClientWithServer; // =connection(serverIP, serverPort);
-	if (fdClientWithServer<0) {
-		fprintf(stderr, "unable to connect with the binder\n");
-		return -1;
-	}
-
-	/* Now contact the server gotten from the binder */
-
-	uint32_t messageLenServer;
-	uint32_t messageTypeServer = EXECUTE;
-
-	// Send the length
-	sendInt(fdClientWithServer, &messageLenServer, sizeof(messageLenServer), 0);
-
-	// Send the message type
-	sendInt(fdClientWithServer, &messageTypeServer, sizeof(messageTypeServer), 0);
-
-	// Send the message
-
-	/* Receive response back from the Server */
-
-	// Get the length
-
-	// Get the message type
+	receiveInt(fdClientWithBinder, &binderResponseType, sizeof(binderResponseType), 0);
 
 	// Get the message
+	if (binderResponseType == LOC_SUCCESS) {
+		receiveMessage(fdClientWithBinder, binderPositiveResponse, binderResponseLen, 0);
 
+		/* Now contact the server gotten from the binder */
+		char* serverIP = (char*)malloc(SERVERIP);
+		char* serverPort = (char*)malloc(SERVERPORT);
+		memcpy(serverIP, binderPositiveResponse, SERVERIP);
+		memcpy(serverPort, binderPositiveResponse+SERVERIP, SERVERPORT);
+
+		int fdClientWithServer = connection(serverIP, serverPort);
+		if (fdClientWithServer<0) {
+			fprintf(stderr, "unable to connect with the binder\n");
+			return -1;
+		}
+		uint32_t messageLenServer;
+		uint32_t messageTypeServer = EXECUTE;
+
+		// Send the length
+		sendInt(fdClientWithServer, &messageLenServer, sizeof(messageLenServer), 0);
+
+		// Send the message type
+		sendInt(fdClientWithServer, &messageTypeServer, sizeof(messageTypeServer), 0);
+
+		// Send the message
+			// How to send *name + *argTypes + **args. **args is a pointer to a pointer
+
+		/* Receive response back from the Server */
+		uint32_t serverResponseLen;
+		uint32_t serverResponseType;
+		char* serverPositiveResponse = (char*)malloc(totalLen);/*Length of char *name+int *argTypes+ void **args */
+		uint32_t serverNegativeResponse;
+
+		// Get the length
+		receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
+
+		// Get the message type
+		receiveInt(fdClientWithServer, &serverResponseType, sizeof(serverResponseType), 0);
+
+		// Get the message
+		if (serverResponseType == EXECUTE_SUCCESS) {
+
+			receiveMessage(fdClientWithServer, serverPositiveResponse, binderResponseLen, 0);
+
+			// Put it back into **args
+
+		}
+		else if (serverResponseType == EXECUTE_FAILURE) {
+
+			receiveInt(fdClientWithServer, &serverNegativeResponse, serverResponseLen, 0);
+
+			if (serverNegativeResponse == SERVER_CANNOT_HANDLE_REQUEST) {
+				printf("server does not have this procedure\n");
+			}
+			else if (serverNegativeResponse == SERVER_IS_OVERLOADED) {
+				printf("server is currently overloaded, try again later...\n");
+			}
+		}
+
+		free(serverPositiveResponse);
+
+	}
+	else if (binderResponseType == LOC_FAILURE) {
+
+		receiveInt(fdClientWithBinder, &binderNegativeResponse, binderResponseLen, 0);
+
+		if (binderNegativeResponse == NO_SERVER_CAN_HANDLE_REQUEST) {
+			printf("no server can handle the request\n");
+		}
+
+	}
+
+	free(binderPositiveResponse);
 	
 	return 0;
 }
@@ -237,7 +293,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	/* Get the response back from the binder */ 
 	uint32_t receiveLength;
 	uint32_t receiveType;
-	char* registerResponseMessage;
+	uint32_t responseMessage;
 
 	// Get the length
 	receiveInt(fdServerWithBinder, &receiveLength, sizeof(receiveLength), 0);
@@ -246,14 +302,32 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	receiveInt(fdServerWithBinder, &receiveType, sizeof(receiveType), 0);
 
 	// Get the message
-	receiveMessage(fdServerWithBinder, registerResponseMessage, receiveLength, 0);
+	receiveInt(fdServerWithBinder, &responseMessage, receiveLength, 0);
 
 	/* Second Register Step: Associate the server skeleton with the name and list of args */
+	if (receiveType == REGISTER_SUCCESS) {
+		if (responseMessage == PREVIOUSLY_REGISTERED) {
+			printf("binder previously registered this function and argTypes\n");
+		}
+		else if (responseMessage == NEW_REGISTRATION) {
+			char* newFuncNameargTypes = (char*)malloc(FUNCNAMELENGTH+lengthOfargTypesArray);
+			memcpy(newFuncNameargTypes, name, FUNCNAMELENGTH);
+			memcpy(newFuncNameargTypes+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
+			std::string newFuncNameargTypesStrKey(newFuncNameargTypes);
+
+			// Add to list of registered functions
+			listOfRegisteredFuncArgTypes[newFuncNameargTypesStrKey] = f;
+		}
+	}
+	else if (receiveType == REGISTER_FAILURE) {
+		if (responseMessage == BINDER_UNABLE_TO_REGISTER) {
+			perror("binder unable to register\n");
+		}
+	}
 
 
 	// Free
 	free(message);
-	free(registerResponseMessage);
 
 	return 0;
 }
@@ -306,7 +380,7 @@ int rpcExecute() { /*Jk*/
 		// select() blocks until a new connection request or message on current connection
 		ret = select(fdmax+1, &read_fds, NULL, NULL, NULL);
 		if (ret ==-1) {
-			perror("error on select()'s return");
+			perror("error on select()'s return\n");
 		}
 
 		// Once select returns, loop through the file descriptor list
@@ -324,7 +398,7 @@ int rpcExecute() { /*Jk*/
 					}
 					
 					if (newfd == -1) {
-						perror("error when accepting new connection");
+						perror("error when accepting new connection\n");
 					}
 
 					else {

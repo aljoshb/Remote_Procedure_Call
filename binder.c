@@ -122,8 +122,10 @@ int main() {
 	/* Dictionary and vector to database */
 	std::map<std::string, std::vector<std::string> > binderDatabaseStr;
 
+	int continueRunning = 1;
+
 	/* Binder runs forever, accepting connections and processing data until a termination message */
-	while (1) {
+	while (continueRunning == 1) {
 
 		// At the start of each iteration copy master_fd into read_fds
 		read_fds = master_fd;
@@ -170,6 +172,8 @@ int main() {
 
 					if (messageType == TERMINATE) {
 
+						continueRunning = 0;
+						
 						// Inform all the servers
 						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
 							if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
@@ -207,33 +211,34 @@ int main() {
 							char* newFuncNameargTypes = (char*)malloc(FUNCNAMELENGTH+lengthOfargTypesArray);;
 							memcpy(newFuncNameargTypes, funcName, FUNCNAMELENGTH);
 							memcpy(newFuncNameargTypes+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
-							std::string newFuncNameargTypesStr(newFuncNameargTypes);
+							std::string newFuncNameargTypesStrKey(newFuncNameargTypes);
 							char *serverIden = (char*)malloc(SERVERIP+SERVERPORT);
 							memcpy(serverIden, newServerHostName, SERVERIP);
 							memcpy(serverIden+SERVERIP, &newServerPort, SERVERPORT);
-							std::string valueServerLoc(serverIden);
+							std::string serverLocValue(serverIden);
 
 							int funcID = -1;
 							int added = -1;
 							int previouslyAdded = -1;
 							
-							//Check if the key newFuncNameargTypes already exists in the dictionary
-							if (binderDatabaseStr.count(newFuncNameargTypesStr)>0) {
+							// Check if the key newFuncNameargTypes already exists in the dictionary
+							if (binderDatabaseStr.count(newFuncNameargTypesStrKey)>0) {
+
 								// It exists. Check if this server has already been added to the list for this funcArgTypes combo
-								size_t size = 10;
-								for (int g=0;g<binderDatabaseStr[newFuncNameargTypesStr].size();g++) {
-									if (binderDatabaseStr[newFuncNameargTypesStr][g] == valueServerLoc) {
+								for (int g=0;g<binderDatabaseStr[newFuncNameargTypesStrKey].size();g++) {
+									if ( (binderDatabaseStr[newFuncNameargTypesStrKey][g]).compare(serverLocValue) == 0 ) { // Already added
+										//binderDatabaseStr[newFuncNameargTypesStrKey][g] == serverLocValue) {
 
 										// Update it
-										binderDatabaseStr[newFuncNameargTypesStr][g] = valueServerLoc;
+										binderDatabaseStr[newFuncNameargTypesStrKey][g] = serverLocValue;
 										previouslyAdded = 1;
 
 										break;
 
 									}
 								}
-								if (!previouslyAdded) {
-									binderDatabaseStr[newFuncNameargTypesStr].push_back(valueServerLoc);
+								if (previouslyAdded==-1) { // Not yet added
+									binderDatabaseStr[newFuncNameargTypesStrKey].push_back(serverLocValue);
 								}
 
 								// Update added
@@ -242,20 +247,56 @@ int main() {
 							else {
 								// It doesn't exist, add it
 								std::vector <std::string> addThisValue;
-								addThisValue.push_back(valueServerLoc);
-								binderDatabaseStr[newFuncNameargTypesStr]= addThisValue;
+								addThisValue.push_back(serverLocValue);
+								binderDatabaseStr[newFuncNameargTypesStrKey]= addThisValue;
 								
 								// Update added
 								added = 1;
 							}
 
 							// Respond to the server
+							uint32_t responseLength = 4; // Just 4 bytes
+							uint32_t responseType;
+							uint32_t responseMessage;
+
+							// Send the message length
+							sendInt(i, &responseLength, sizeof(responseLength), 0);
+
 							if (previouslyAdded == 1 ) {
 								// Respond with REGISTER_SUCCESS as type and PREVIOUSLY_REGISTERED as message
+								responseType = REGISTER_SUCCESS;
+								responseMessage = PREVIOUSLY_REGISTERED;
+
+								// Send the message Type
+								sendInt(i, &responseType, sizeof(responseType), 0);
+
+								// Send the message
+								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
+
 
 							}
 							else if (added ==1) {
 								// Respond with REGISTER_SUCCESS as type and NEW_REGISTRATION as message
+								responseType = REGISTER_SUCCESS;
+								responseMessage = NEW_REGISTRATION;
+
+								// Send the message Type
+								sendInt(i, &responseType, sizeof(responseType), 0);
+
+								// Send the message
+								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
+							} 
+							else {
+								// Respond with REGISTER_FAILURE as type and BINDER_UNABLE_TO_REGISTER as message
+								responseType = REGISTER_FAILURE;
+								responseMessage = BINDER_UNABLE_TO_REGISTER;
+
+								// Send the message Type
+								sendInt(i, &responseType, sizeof(responseType), 0);
+
+								// Send the message
+								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
+								
 
 							}
 
@@ -277,11 +318,78 @@ int main() {
 							memcpy(argTypes, message+FUNCNAMELENGTH, lengthOfargTypesArray);
 
 							// Find the ip address and port number of a server that can service the client's request
+							char *funcArgTypesToFind = (char*)malloc(messageLength);
+							memcpy(funcArgTypesToFind, message, messageLength);
+							std::string funcArgTypesToFindKey(funcArgTypesToFind);
 
+							uint32_t responseLength;
+							uint32_t responseType;
 
+							// Check that such a func and argTypes combo exists
+							if (binderDatabaseStr.count(funcArgTypesToFindKey)>0) {
+								// Respond with the server info
+								responseLength = SERVERIP+SERVERPORT;
+								responseType = LOC_SUCCESS;
+								std::string serverThatCanHandle;
+								char *serverInfo = (char*)malloc(SERVERIP+SERVERPORT);
+
+								if (binderDatabaseStr[funcArgTypesToFindKey].size()==1) {
+									
+									// Only one server can handle it
+									serverThatCanHandle = binderDatabaseStr[funcArgTypesToFindKey][0];
+									strcpy(serverInfo, serverThatCanHandle.c_str());
+
+									// Send the message length
+									sendInt(i, &responseLength, sizeof(responseLength), 0);
+
+									// Send the message Type
+									sendInt(i, &responseType, sizeof(responseType), 0);
+
+									// Send the message
+									sendMessage(i, serverInfo, responseLength, 0);
+								}
+
+								else {
+									// Multiple servers can handle it
+									// Do round robin to find the appropriate server
+
+									// For now, do it trivially and send the first server. 
+									// Yet to implement round robin approach
+									serverThatCanHandle = binderDatabaseStr[funcArgTypesToFindKey][0];
+									strcpy(serverInfo, serverThatCanHandle.c_str());
+
+									// Send the message length
+									sendInt(i, &responseLength, sizeof(responseLength), 0);
+
+									// Send the message Type
+									sendInt(i, &responseType, sizeof(responseType), 0);
+
+									// Send the message
+									sendMessage(i, serverInfo, responseLength, 0);
+								}
+								
+								free(serverInfo);
+
+							}
+							else {
+								// Respond with LOC_FAILURE and reasonCode
+								responseLength = 4;
+								responseType = LOC_FAILURE;
+								uint32_t responseMessage = NO_SERVER_CAN_HANDLE_REQUEST;
+
+								// Send the message length
+								sendInt(i, &responseLength, sizeof(responseLength), 0);
+
+								// Send the message Type
+								sendInt(i, &responseType, sizeof(responseType), 0);
+
+								// Send the message
+								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
+							}
 							// Free
 							free(funcName);
 							free(argTypes);
+							free(funcArgTypesToFind);
 						}
 
 						// If error or no data, close socket with this client or server
@@ -299,10 +407,10 @@ int main() {
 			}
 		}
 
-		if (messageType == TERMINATE) {
-			// Break again
-			break;
-		}
+		// if (messageType == TERMINATE) {
+		// 	// Break again
+		// 	break;
+		// }
 
 	}
 
