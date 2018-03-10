@@ -26,7 +26,7 @@ int fdServerWithBinder = -1;
 
 /* Server location info */
 char getServerHostName[SERVERIP];
-uint32_t serverPort;
+char* serverPort = (char*)malloc(SERVERPORT);
 
 /* Client socket file descriptors with the binder */
 int fdClientWithBinder = -1;
@@ -95,8 +95,9 @@ int rpcInit() { /*Josh*/
 		if (r==-1) {
 			perror("error on gethostname");
 		}
-		serverPort = ntohs(serverAddress.sin_port);
-
+		//serverPort = ntohs(serverAddress.sin_port);
+		memset(serverPort, 0, SERVERPORT);
+		sprintf(serverPort, "%d", ntohs(serverAddress.sin_port));
 		// printf("SERVER_ADDRESS %s\n",getServerHostName);
 		// printf("SERVER_PORT %d\n", serverPort);
 	}
@@ -182,11 +183,11 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 		/* Now contact the server gotten from the binder */
 		char* serverIP = (char*)malloc(SERVERIP);
-		char* serverPort = (char*)malloc(SERVERPORT);
+		char* serverPortLoc = (char*)malloc(SERVERPORT);
 		memcpy(serverIP, binderPositiveResponse, SERVERIP);
-		memcpy(serverPort, binderPositiveResponse+SERVERIP, SERVERPORT);
+		memcpy(serverPortLoc, binderPositiveResponse+SERVERIP, SERVERPORT);
 
-		int fdClientWithServer = connection(serverIP, serverPort);
+		int fdClientWithServer = connection(serverIP, serverPortLoc);
 		if (fdClientWithServer<0) {
 			fprintf(stderr, "unable to connect with the binder\n");
 			return -1;
@@ -276,7 +277,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	char* message = (char*)malloc(messageLength);
 	memset(message, 0, messageLength); // Pad with zeroes first
 	memcpy(message, getServerHostName, SERVERIP); // server ip
-	memcpy(message+SERVERIP, &serverPort, SERVERPORT); // server port
+	memcpy(message+SERVERIP, serverPort, SERVERPORT); // server port
 	memcpy(message+SERVERIP+SERVERPORT, name, strlen(name)); // func name
 	memcpy(message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray); // argTypes array
 

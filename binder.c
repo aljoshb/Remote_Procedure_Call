@@ -90,6 +90,7 @@ int main() {
 		}
 		printf("BINDER_ADDRESS %s\n",getBinderHostName);
 		printf("BINDER_PORT %d\n", ntohs(binderAddress.sin_port));
+
 	}
 
 	/* Select to switch between servers and clients connections requests and processing */
@@ -173,7 +174,7 @@ int main() {
 					if (messageType == TERMINATE) {
 
 						continueRunning = 0;
-						
+
 						// Inform all the servers
 						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
 							if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
@@ -197,13 +198,13 @@ int main() {
 						if (messageType == REGISTER) {
 							// Set the server ip, port, function name and argTypes array 
 							char* newServerHostName=(char*)malloc(SERVERIP);
-							uint32_t newServerPort;
+							char* newServerPort=(char*)malloc(SERVERPORT);
 							char *funcName = (char*)malloc(FUNCNAMELENGTH);
 							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
 							int lengthOfargTypesArray = messageLength-(SERVERIP+SERVERPORT+FUNCNAMELENGTH);
 							
 							memcpy(newServerHostName, message, SERVERIP); // server ip
-							memcpy(&newServerPort, message+SERVERIP, SERVERPORT); // server port
+							memcpy(newServerPort, message+SERVERIP, SERVERPORT); // server port
 							memcpy(funcName, message+SERVERIP+SERVERPORT, FUNCNAMELENGTH); // func name
 							memcpy(argTypes, message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, lengthOfargTypesArray); // argTypes array
 
@@ -214,7 +215,7 @@ int main() {
 							std::string newFuncNameargTypesStrKey(newFuncNameargTypes);
 							char *serverIden = (char*)malloc(SERVERIP+SERVERPORT);
 							memcpy(serverIden, newServerHostName, SERVERIP);
-							memcpy(serverIden+SERVERIP, &newServerPort, SERVERPORT);
+							memcpy(serverIden+SERVERIP, newServerPort, SERVERPORT);
 							std::string serverLocValue(serverIden);
 
 							int funcID = -1;
@@ -302,6 +303,7 @@ int main() {
 
 							// Free
 							free(newServerHostName);
+							free(newServerPort);
 							free(funcName);
 							free(argTypes);
 							free(newFuncNameargTypes);

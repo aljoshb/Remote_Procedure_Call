@@ -30,7 +30,7 @@ extern "C" {
 /* Max length of function name, server ip and port */
 #define FUNCNAMELENGTH 	65
 #define SERVERIP 		256
-#define SERVERPORT 		4
+#define SERVERPORT 		5
 
 #ifdef __cplusplus
 }
