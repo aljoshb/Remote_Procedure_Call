@@ -137,6 +137,7 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 	// Set the message length
 	int i=0;
+	int sizeOfargTypesArray;
 	int lengthOfargTypesArray;
 	while (true) {
 		if (*(argTypes+i) == 0) {
@@ -145,14 +146,15 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		}
 		i++;
 	}
-	messageLenBinder = FUNCNAMELENGTH + lengthOfargTypesArray; // name+argTypes[]+args[]
-	int totalLen = FUNCNAMELENGTH + (2*lengthOfargTypesArray) - 1;
-
+	sizeOfargTypesArray = lengthOfargTypesArray * sizeof(int);
+	messageLenBinder = FUNCNAMELENGTH + sizeOfargTypesArray; // name+argTypes[]+args[]
+	int totalLen = FUNCNAMELENGTH + (2*lengthOfargTypesArray) - 1; // Wrong
+ 
 	// Prepare the message
 	char* message = (char*)malloc(messageLenBinder);
 	memset(message, 0, FUNCNAMELENGTH); // Pad with zeroes first
 	memcpy(message, name, strlen(name));
-	memcpy(message+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
+	memcpy(message+FUNCNAMELENGTH, argTypes, sizeOfargTypesArray);
 
 	// Send the message length
 	sendInt(fdClientWithBinder, &messageLenBinder, sizeof(messageLenBinder), 0);
@@ -263,6 +265,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 
 	// Set the message length
 	int i=0;
+	int sizeOfargTypesArray;
 	int lengthOfargTypesArray;
 	while (true) {
 		if (*(argTypes+i) == 0) {
@@ -271,7 +274,9 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 		}
 		i++;
 	}
-	messageLength = SERVERIP + SERVERPORT + FUNCNAMELENGTH + lengthOfargTypesArray;
+
+	sizeOfargTypesArray = lengthOfargTypesArray * sizeof(int);
+	messageLength = SERVERIP + SERVERPORT + FUNCNAMELENGTH + sizeOfargTypesArray;
 
 	// Prepare the message
 	char* message = (char*)malloc(messageLength);
@@ -279,7 +284,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	memcpy(message, getServerHostName, SERVERIP); // server ip
 	memcpy(message+SERVERIP, serverPort, SERVERPORT); // server port
 	memcpy(message+SERVERIP+SERVERPORT, name, strlen(name)); // func name
-	memcpy(message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray); // argTypes array
+	memcpy(message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, argTypes, sizeOfargTypesArray); // argTypes array
 
 	// Send the length
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0);
@@ -311,9 +316,9 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 			printf("binder previously registered this function and argTypes\n");
 		}
 		else if (responseMessage == NEW_REGISTRATION) {
-			char* newFuncNameargTypes = (char*)malloc(FUNCNAMELENGTH+lengthOfargTypesArray);
+			char* newFuncNameargTypes = (char*)malloc(FUNCNAMELENGTH+sizeOfargTypesArray);
 			memcpy(newFuncNameargTypes, name, FUNCNAMELENGTH);
-			memcpy(newFuncNameargTypes+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
+			memcpy(newFuncNameargTypes+FUNCNAMELENGTH, argTypes, sizeOfargTypesArray);
 			std::string newFuncNameargTypesStrKey(newFuncNameargTypes);
 
 			// Add to list of registered functions
