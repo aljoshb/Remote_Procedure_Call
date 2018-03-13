@@ -23,7 +23,7 @@
 #define BACKLOG 100
 
 int main() {
-	
+
 	/* Binder Socket (some code gotten from http://beej.us tutorial) */
 	int error;
 	int binderSocket;
@@ -67,7 +67,7 @@ int main() {
 	if (goodres == NULL) {
 		fprintf(stderr, "failed to bind\n");
 	}
-
+	std::cout<<"Binder Listening...." <<std::endl;
 	/* Free the res linked list structure. Don't need it anymore */
 	freeaddrinfo(res);
 
@@ -121,9 +121,16 @@ int main() {
 	int lastFuncAdded=0;
 
 	/* Dictionary and vector to database */
-	std::map<std::string, std::vector<std::string> > binderDatabaseStr;
+	//std::map<std::string, std::vector<std::string> > binderDatabaseStr;
+	std::map<int, std::vector<std::string> > binderDatabaseStr;
 
 	int continueRunning = 1;
+
+	/* Dictionary to store int to funcArgTypes mapping */
+	std::map<int, struct funcStruct*> funcToMap;
+
+	/* Dictionary to store the server info */
+	std::map<std::string, struct serverInfo*> serverMap;
 
 	/* Binder runs forever, accepting connections and processing data until a termination message */
 	while (continueRunning == 1) {
@@ -143,7 +150,7 @@ int main() {
 			if (FD_ISSET(i, &read_fds)) {
 				if (i == binderSocket) { // Received a new connection request
 
-					
+					std::cout<<"Binder Accepted new connection...." <<std::endl;
 					addrlen = sizeof remoteaddr;
 					newfd = accept(binderSocket, (struct sockaddr *)&remoteaddr, &addrlen);
 					if (newfd == -1) {
@@ -160,26 +167,28 @@ int main() {
 					}
 				}
 				else { // Received data from an existing connection
-
+					std::cout<<"Binder Accepted Data...." <<std::endl;
 					// First, get the length of the incoming message
 					receiveInt(i, &messageLength, sizeof(messageLength), 0);
-
+					std::cout<<"Message length: " <<messageLength<<std::endl;
 					// Allocate the appropriate memory and get the message
 					char *message;
 					message = (char*) malloc (messageLength);
 
 					// Next, get the type of the incoming message
 					receiveInt(i, &messageType, sizeof(messageType), 0);
+					std::cout<<"Message Type: " <<messageType<<std::endl;
 
+					// TERMINATION
 					if (messageType == TERMINATE) {
-
+						std::cout<<"Binder Received termination request...." <<std::endl;
 						continueRunning = 0;
 
 						// Inform all the servers
 						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
 							if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
 								
-								//Send the length
+								// Send the length
 								sendInt(i, &messageLength, sizeof(messageLength), 0);
 
 								// Send the message (Just the type: TERMINATE)
@@ -191,47 +200,103 @@ int main() {
 						break;
 
 					}
+
+					// REGISTRATION OR LOC_REQUEST
 					else {
-						// Get the message, either REGISTER or LOC_REQUEST
-						receiveMessage(i, message, messageLength, 0);
+						std::cout<<"Either REGISTER or LOC_REQUEST received"<<std::endl;
 
 						if (messageType == REGISTER) {
+							std::cout<<"Binder Received registration request...." <<std::endl;
+
 							// Set the server ip, port, function name and argTypes array 
 							char* newServerHostName=(char*)malloc(SERVERIP);
 							char* newServerPort=(char*)malloc(SERVERPORT);
 							char *funcName = (char*)malloc(FUNCNAMELENGTH);
-							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
-							int lengthOfargTypesArray = messageLength-(SERVERIP+SERVERPORT+FUNCNAMELENGTH);
 							
-							memcpy(newServerHostName, message, SERVERIP); // server ip
-							memcpy(newServerPort, message+SERVERIP, SERVERPORT); // server port
-							memcpy(funcName, message+SERVERIP+SERVERPORT, FUNCNAMELENGTH); // func name
-							memcpy(argTypes, message+SERVERIP+SERVERPORT+FUNCNAMELENGTH, lengthOfargTypesArray); // argTypes array
+							// Get the serveridentifier
+							// messageLength = SERVERIP;
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							receiveMessage(i, newServerHostName, messageLength, 0);
+							std::cout<<"Message received: "<<newServerHostName<<std::endl;
 
-							// Create the funcName and argTypes pair for the dictionary. Store each funcName and argTypes pair as an int
-							char* newFuncNameargTypes = (char*)malloc(FUNCNAMELENGTH+lengthOfargTypesArray);;
-							memcpy(newFuncNameargTypes, funcName, FUNCNAMELENGTH);
-							memcpy(newFuncNameargTypes+FUNCNAMELENGTH, argTypes, lengthOfargTypesArray);
-							std::string newFuncNameargTypesStrKey(newFuncNameargTypes);
-							char *serverIden = (char*)malloc(SERVERIP+SERVERPORT);
-							memcpy(serverIden, newServerHostName, SERVERIP);
-							memcpy(serverIden+SERVERIP, newServerPort, SERVERPORT);
+							// Get the port
+							// messageLength = SERVERPORT;
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							receiveMessage(i, newServerPort, messageLength, 0);
+							std::cout<<"Message received: "<<newServerPort<<std::endl;
+
+							// Get the funcName
+							// messageLength = FUNCNAMELENGTH;
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							receiveMessage(i, funcName, messageLength, 0);
+							std::cout<<"Message received: "<<funcName<<std::endl;
+
+							// Get the argTypes
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							int *argTypes = (int*)malloc(messageLength);
+							int sizeOfArgTypesArray = messageLength;
+							int lengthOfargTypesArray = sizeOfArgTypesArray / sizeof(int);
+							int getLength = recv(i, argTypes, messageLength, 0);
+							if (getLength!=messageLength) {
+								int justInCase=getLength;
+								while (justInCase<=messageLength) {
+									getLength = recv(i, argTypes+getLength, messageLength-getLength, 0);
+									justInCase+=getLength;
+								}
+							}
+							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
+
+							// Create the funcName and argTypes pair for the dictionary
+							char *serverIden = (char*)malloc(strlen(newServerHostName)+strlen(newServerPort)+1);
+							memcpy(serverIden, newServerHostName, strlen(newServerHostName));
+							char* delimiter=";";
+							memcpy(serverIden+strlen(newServerHostName), delimiter, 1); // Divide the server ip and port by ';'
+							memcpy(serverIden+strlen(newServerHostName)+1, newServerPort, strlen(newServerPort));
 							std::string serverLocValue(serverIden);
-
-							int funcID = -1;
+							std::cout<<"new server value: "<<serverLocValue<<std::endl;
+							struct serverInfo *newserverInfo = (struct serverInfo*)malloc(sizeof (struct serverInfo));
+							newserverInfo->sockfd = i;
+							newserverInfo->serverIP = newServerHostName;
+							newserverInfo->serverPort = newServerPort;
+							serverMap[serverLocValue] = newserverInfo;
+							
 							int added = -1;
 							int previouslyAdded = -1;
-							
-							// Check if the key newFuncNameargTypes already exists in the dictionary
-							if (binderDatabaseStr.count(newFuncNameargTypesStrKey)>0) {
+
+							int key;
+							int found=-1;
+							int count=0;
+							for (int k=0;k<funcToMap.size();k++) {
+								if (funcToMap.count(k+1)>0 && 
+									strcmp (funcToMap[k+1]->funcName, funcName)==0 && 
+									funcToMap[k+1]->argTypesLen ==  lengthOfargTypesArray) {
+
+									for (int h=0; h<funcToMap[k+1]->argTypesLen; h++) {
+										if (funcToMap[k+1]->argTypes[h]==argTypes[h]) {
+											count +=1;
+										}
+										else {
+											count-=1;
+										}
+									}
+								}
+
+								if (count == funcToMap[k+1]->argTypesLen) {
+									key = k+1;
+									found = 1;
+									break;
+								}
+								
+							}
+
+							if (found ==1) { // A server already registered this funcArgTypes
 
 								// It exists. Check if this server has already been added to the list for this funcArgTypes combo
-								for (int g=0;g<binderDatabaseStr[newFuncNameargTypesStrKey].size();g++) {
-									if ( (binderDatabaseStr[newFuncNameargTypesStrKey][g]).compare(serverLocValue) == 0 ) { // Already added
-										//binderDatabaseStr[newFuncNameargTypesStrKey][g] == serverLocValue) {
+								for (int g=0;g<binderDatabaseStr[key].size();g++) {
+									if ( (binderDatabaseStr[key][g]).compare(serverLocValue) == 0 ) { // Already added
 
 										// Update it
-										binderDatabaseStr[newFuncNameargTypesStrKey][g] = serverLocValue;
+										binderDatabaseStr[key][g] = serverLocValue;
 										previouslyAdded = 1;
 
 										break;
@@ -239,17 +304,24 @@ int main() {
 									}
 								}
 								if (previouslyAdded==-1) { // Not yet added
-									binderDatabaseStr[newFuncNameargTypesStrKey].push_back(serverLocValue);
+									binderDatabaseStr[key].push_back(serverLocValue);
 								}
 
 								// Update added
 								added = 1;
 							}
-							else {
+							else { // Not yet registered
+								struct funcStruct* newFunStruct = (struct funcStruct*)malloc(sizeof (struct funcStruct));
+								newFunStruct->funcName = funcName;
+								newFunStruct->argTypes = argTypes;
+								newFunStruct->argTypesLen = lengthOfargTypesArray;
+								key = funcToMap.size();
+								funcToMap[key] = newFunStruct;
+
 								// It doesn't exist, add it
 								std::vector <std::string> addThisValue;
 								addThisValue.push_back(serverLocValue);
-								binderDatabaseStr[newFuncNameargTypesStrKey]= addThisValue;
+								binderDatabaseStr[key]= addThisValue;
 								
 								// Update added
 								added = 1;
@@ -306,11 +378,11 @@ int main() {
 							free(newServerPort);
 							free(funcName);
 							free(argTypes);
-							free(newFuncNameargTypes);
+							free(serverIden);
 
 						}
 						else if (messageType == LOC_REQUEST) {
-
+							std::cout<<"Binder Received location request...." <<std::endl;
 							// Set the function name and argTypes array
 							char *funcName = (char*)malloc(FUNCNAMELENGTH);
 							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
@@ -326,19 +398,20 @@ int main() {
 
 							uint32_t responseLength;
 							uint32_t responseType;
+							int key;
 
 							// Check that such a func and argTypes combo exists
-							if (binderDatabaseStr.count(funcArgTypesToFindKey)>0) {
+							if (binderDatabaseStr.count(key)>0) {
 								// Respond with the server info
 								responseLength = SERVERIP+SERVERPORT;
 								responseType = LOC_SUCCESS;
 								std::string serverThatCanHandle;
 								char *serverInfo = (char*)malloc(SERVERIP+SERVERPORT);
 
-								if (binderDatabaseStr[funcArgTypesToFindKey].size()==1) {
+								if (binderDatabaseStr[key].size()==1) {
 									
 									// Only one server can handle it
-									serverThatCanHandle = binderDatabaseStr[funcArgTypesToFindKey][0];
+									serverThatCanHandle = binderDatabaseStr[key][0];
 									strcpy(serverInfo, serverThatCanHandle.c_str());
 
 									// Send the message length
@@ -357,7 +430,7 @@ int main() {
 
 									// For now, do it trivially and send the first server. 
 									// Yet to implement round robin approach
-									serverThatCanHandle = binderDatabaseStr[funcArgTypesToFindKey][0];
+									serverThatCanHandle = binderDatabaseStr[key][0];
 									strcpy(serverInfo, serverThatCanHandle.c_str());
 
 									// Send the message length

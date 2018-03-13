@@ -3,6 +3,24 @@
 extern "C" {
 #endif
 
+struct serverInfo {
+	int sockfd;
+	char* serverIP;
+	char* serverPort;
+};
+
+struct funcStruct {
+	char* funcName;
+	int* argTypes;
+	int argTypesLen;
+};
+
+struct funcStructServer {
+	char* funcName;
+	int* argTypes;
+	skeleton f;
+};
+
 /* Message types */
 #define REGISTER 			1
 #define REGISTER_SUCCESS	2
@@ -31,6 +49,18 @@ extern "C" {
 #define FUNCNAMELENGTH 	65
 #define SERVERIP 		256
 #define SERVERPORT 		5
+
+/* Type info */
+#define ARG_CHAR 		1
+#define ARG_SHORT 		2
+#define ARG_INT 		3
+#define ARG_LONG 		4
+#define ARG_DOUBLE 		5
+#define ARG_FLOAT 		6
+
+/* Input/Output nature */
+#define ARG_INPUT 		31
+#define ARG_OUTPUT 		30
 
 #ifdef __cplusplus
 }

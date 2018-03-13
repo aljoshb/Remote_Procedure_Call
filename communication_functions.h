@@ -3,6 +3,7 @@
 extern "C" {
 #endif
 
+int getTypeSize(int typeGotten);
 int sendInt(int socketfd, uint32_t *numToSend, size_t length, int flags);
 int receiveInt(int socketfd, uint32_t *numToReceive, size_t length, int flags);
 int sendMessage(int socketfd, char *messageToSend, size_t length, int flags);

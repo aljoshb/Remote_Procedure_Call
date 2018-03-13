@@ -14,6 +14,43 @@
 #include "binder.h"
 #include "communication_functions.h"
 
+/* Get the type from the macros */
+int getTypeSize(int typeGotten) {
+
+	int typeOfArgs;
+
+	switch(typeGotten) {
+
+		case ARG_CHAR:
+			typeOfArgs = sizeof(char);
+			break;
+
+		case ARG_SHORT:
+			typeOfArgs = sizeof(short);
+			break;
+
+		case ARG_INT:
+			typeOfArgs = sizeof(int);
+			break;
+
+		case ARG_LONG:
+			typeOfArgs = sizeof(long);
+			break;
+
+		case ARG_DOUBLE:
+			typeOfArgs = sizeof(double);
+			break;
+
+		case ARG_FLOAT:
+			typeOfArgs = sizeof(float);
+			break;
+	  
+		default:
+			printf("Invalid Type\n");
+	}
+
+	return typeOfArgs;
+}
 
 /* This will be used to send the length and message Types */
 int sendInt(int socketfd, uint32_t *numToSend, size_t length, int flags) {
@@ -123,14 +160,14 @@ int connection(const char *destIP, const char *destPort) {
 		socketfd = socket(goodres2->ai_family, goodres2->ai_socktype, goodres2->ai_protocol);
 		if (socketfd<0) { // i.e. not -1
 			// Not found yet!
-			perror("error on creating socket to connect to the binder");
+			perror("error on creating socket\n");
 			continue;
 		}
 
 		// Connect
 		if (connect(socketfd, goodres2->ai_addr, goodres2->ai_addrlen) == -1) {
 			close(socketfd);
-			perror("error on connecting to the binder");
+			perror("error on creating a new connection\n");
 			continue;
 		}
 		break;
