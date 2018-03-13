@@ -32,7 +32,13 @@ char* serverPort = (char*)malloc(SERVERPORT);
 int fdClientWithBinder = -1;
 
 /* Store the registered function and its skeleton */
-std::vector<struct funcStructServer> listOfRegisteredFuncArgTypesNew;
+// struct funcStructServer {
+// 	char* funcName;
+// 	int* argTypes;
+// 	skeleton f;
+// };
+
+// std::vector<funcStructServer> listOfRegisteredFuncArgTypesNew;
 
 int rpcInit() { /*Josh*/
 	
@@ -342,26 +348,26 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	// Send the type
 	messageLength = sizeof(messageType);
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0);
-	sendInt(fdServerWithBinder, &messageType, sizeof(messageType), 0);
+	sendInt(fdServerWithBinder, &messageType, messageLength, 0);
 
 	// Send the serveridentifier
-	messageLength = strlen(getServerHostName)+1;
+	messageLength = strlen(getServerHostName);//+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
-	getServerHostName[strlen(getServerHostName)] ='\0';
+	//getServerHostName[strlen(getServerHostName)] ='\0';
 	sendMessage(fdServerWithBinder, getServerHostName, messageLength, 0);
 	std::cout<<"Message sent: "<<getServerHostName<<std::endl;
 
 	// Send the port
-	messageLength = strlen(serverPort)+1;
+	messageLength = strlen(serverPort);//+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
-	serverPort[strlen(serverPort)] ='\0';
+	//serverPort[strlen(serverPort)] ='\0';
 	sendMessage(fdServerWithBinder, serverPort, messageLength, 0);
 	std::cout<<"Message sent: "<<serverPort<<std::endl;
 
 	// Send the funcName
-	messageLength = strlen(name)+1;
+	messageLength = strlen(name);//+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
-	name[strlen(name)] ='\0';
+	//name[strlen(name)] ='\0';
 	sendMessage(fdServerWithBinder, name, messageLength, 0);
 	std::cout<<"Message sent: "<<name<<std::endl;
 
@@ -393,7 +399,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	receiveInt(fdServerWithBinder, &receiveType, sizeof(receiveType), 0);
 
 	// Get the message
-	receiveInt(fdServerWithBinder, &responseMessage, receiveLength, 0);
+	receiveInt(fdServerWithBinder, &responseMessage, sizeof(responseMessage), 0);
 
 	/* Second Register Step: Associate the server skeleton with the name and list of args */
 	if (receiveType == REGISTER_SUCCESS) {
@@ -405,12 +411,12 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 		else if (responseMessage == NEW_REGISTRATION) {
 			printf("NEW_REGISTRATION\n");
 
-			struct funcStructServer newReg;
-			newReg.funcName = name;
-			newReg.argTypes = argTypes;
-			newReg.f = f;
+			// funcStructServer newReg;
+			// newReg.funcName = name;
+			// newReg.argTypes = argTypes;
+			// newReg.f = f;
 
-			listOfRegisteredFuncArgTypesNew[listOfRegisteredFuncArgTypesNew.size()];
+			// listOfRegisteredFuncArgTypesNew[listOfRegisteredFuncArgTypesNew.size()];
 		}
 	}
 	else if (receiveType == REGISTER_FAILURE) {

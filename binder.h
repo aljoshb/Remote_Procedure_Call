@@ -3,23 +3,23 @@
 extern "C" {
 #endif
 
-struct serverInfo {
-	int sockfd;
-	char* serverIP;
-	char* serverPort;
-};
+// struct serverInfo {
+// 	int sockfd;
+// 	char* serverIP;
+// 	char* serverPort;
+// };
 
-struct funcStruct {
-	char* funcName;
-	int* argTypes;
-	int argTypesLen;
-};
+// struct funcStruct {
+// 	char* funcName;
+// 	int* argTypes;
+// 	int argTypesLen;
+// };
 
-struct funcStructServer {
-	char* funcName;
-	int* argTypes;
-	skeleton f;
-};
+// struct funcStructServer {
+// 	char* funcName;
+// 	int* argTypes;
+// 	skeleton f;
+// };
 
 /* Message types */
 #define REGISTER 			1

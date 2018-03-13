@@ -22,6 +22,19 @@
 
 #define BACKLOG 100
 
+struct serverInfo {
+	int sockfd;
+	char* serverIP;
+	char* serverPort;
+};
+
+struct funcStruct {
+	char* funcName;
+	int* argTypes;
+	int argTypesLen;
+};
+
+
 int main() {
 
 	/* Binder Socket (some code gotten from http://beej.us tutorial) */
@@ -121,17 +134,19 @@ int main() {
 	int lastFuncAdded=0;
 
 	/* Dictionary and vector to database */
-	std::map<std::string, std::vector<std::string> > binderDatabaseStr2;
+	// std::map<std::string, std::vector<std::string> > binderDatabaseStr2;
 	std::map<int, std::vector<std::string> > binderDatabaseStr;
+	//std::map<int, std::vector<std::string>::iterator dataBaseIterator;
 
 	int continueRunning = 1;
 
 	/* Dictionary to store int to funcArgTypes mapping */
-	std::map<int, struct funcStruct*> funcToMap;
+	std::map<int, funcStruct> funcToMap;
 
 	/* Dictionary to store the server info */
-	std::map<std::string, struct serverInfo*> serverMap;
-	std::map<std::string, std::string> serverMapStr;
+	std::map<std::string, serverInfo> serverMap;
+	
+	// std::map<std::string, std::string> serverMapStr;
 
 	/* Binder runs forever, accepting connections and processing data until a termination message */
 	while (continueRunning == 1) {
@@ -248,14 +263,15 @@ int main() {
 							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
 
 							// Create the funcName and argTypes pair for the dictionary
-							char *funNameAndArgTypes = (char*)malloc(FUNCNAMELENGTH+sizeOfArgTypesArray);
-							memset(funNameAndArgTypes, -1, FUNCNAMELENGTH+sizeOfArgTypesArray);
-							std::cout<<funNameAndArgTypes<<std::endl;
-							std::cout<<strlen(funNameAndArgTypes)<<std::endl;
-							memcpy(funNameAndArgTypes, funcName, strlen(funcName));
-							memcpy(funNameAndArgTypes+strlen(funcName), argTypes, sizeOfArgTypesArray);
-							std::cout<<funNameAndArgTypes<<std::endl;
-							std::cout<<strlen(funNameAndArgTypes)<<std::endl;
+							// char *funNameAndArgTypes = (char*)malloc(FUNCNAMELENGTH+sizeOfArgTypesArray);
+							// memset(funNameAndArgTypes, -1, FUNCNAMELENGTH+sizeOfArgTypesArray);
+							// std::cout<<funNameAndArgTypes<<std::endl;
+							// std::cout<<strlen(funNameAndArgTypes)<<std::endl;
+							// memcpy(funNameAndArgTypes, funcName, strlen(funcName));
+							// memcpy(funNameAndArgTypes+strlen(funcName), argTypes, sizeOfArgTypesArray);
+							// std::cout<<funNameAndArgTypes<<std::endl;
+							// std::cout<<strlen(funNameAndArgTypes)<<std::endl;
+
 							char *serverIden = (char*)malloc(strlen(newServerHostName)+strlen(newServerPort)+1);
 							memcpy(serverIden, newServerHostName, strlen(newServerHostName));
 							char* delimiter=";";
@@ -264,11 +280,16 @@ int main() {
 							std::string serverLocValue(serverIden);
 							std::cout<<"new server value: "<<serverLocValue<<std::endl;
 							
-							struct serverInfo *newserverInfo = (struct serverInfo*)malloc(sizeof (struct serverInfo));
-							newserverInfo->sockfd = i;
-							newserverInfo->serverIP = newServerHostName;
-							newserverInfo->serverPort = newServerPort;
-							serverMap[serverLocValue] = newserverInfo;
+							serverInfo newserverInfo;// = (struct serverInfo*)malloc(sizeof (struct serverInfo));
+							newserverInfo.sockfd = i;
+							newserverInfo.serverIP = newServerHostName;
+							newserverInfo.serverPort = newServerPort;
+							std::map<std::string, serverInfo>::iterator it;
+							it = serverMap.find(serverLocValue);
+							if (it == serverMap.end()) {
+								serverMap.insert ( std::pair<std::string, serverInfo>(serverLocValue,newserverInfo) );
+							}
+							
 							
 							int added = -1;
 							int previouslyAdded = -1;
@@ -278,11 +299,11 @@ int main() {
 							int count=0;
 							for (int k=0;k<funcToMap.size();k++) {
 								if (funcToMap.count(k+1)>0 && 
-									strcmp (funcToMap[k+1]->funcName, funcName)==0 && 
-									funcToMap[k+1]->argTypesLen ==  lengthOfargTypesArray) {
+									strcmp (funcToMap[k+1].funcName, funcName)==0 && 
+									funcToMap[k+1].argTypesLen ==  lengthOfargTypesArray) {
 
-									for (int h=0; h<funcToMap[k+1]->argTypesLen; h++) {
-										if (funcToMap[k+1]->argTypes[h]==argTypes[h]) {
+									for (int h=0; h<funcToMap[k+1].argTypesLen; h++) {
+										if (funcToMap[k+1].argTypes[h]==argTypes[h]) {
 											count +=1;
 										}
 										else {
@@ -291,7 +312,7 @@ int main() {
 									}
 								}
 
-								if (count == funcToMap[k+1]->argTypesLen) {
+								if (count == funcToMap[k+1].argTypesLen) {
 									key = k+1;
 									found = 1;
 									break;
@@ -299,43 +320,47 @@ int main() {
 								
 							}
 
-							if (found ==1) { // A server already registered this funcArgTypes
+							// --- BAD FROM HERE....
+							// if (found ==1) { // A server already registered this funcArgTypes
 
-								// It exists. Check if this server has already been added to the list for this funcArgTypes combo
-								for (int g=0;g<binderDatabaseStr[key].size();g++) {
-									if ( (binderDatabaseStr[key][g]).compare(serverLocValue) == 0 ) { // Already added
+							// 	// It exists. Check if this server has already been added to the list for this funcArgTypes combo
+							// 	for (int g=0;g<binderDatabaseStr[key].size();g++) {
+							// 		if ( (binderDatabaseStr[key][g]).compare(serverLocValue) == 0 ) { // Already added
 
-										// Update it
-										binderDatabaseStr[key][g] = serverLocValue;
-										previouslyAdded = 1;
+							// 			// Update it
+							// 			binderDatabaseStr[key][g] = serverLocValue;
+							// 			previouslyAdded = 1;
 
-										break;
+							// 			break;
 
-									}
-								}
-								if (previouslyAdded==-1) { // Not yet added
-									binderDatabaseStr[key].push_back(serverLocValue);
-								}
+							// 		}
+							// 	}
+							// 	if (previouslyAdded==-1) { // Not yet added
+							// 		binderDatabaseStr[key].push_back(serverLocValue);
+							// 	}
 
-								// Update added
-								added = 1;
-							}
-							else { // Not yet registered
-								struct funcStruct* newFunStruct = (struct funcStruct*)malloc(sizeof (struct funcStruct));
-								newFunStruct->funcName = funcName;
-								newFunStruct->argTypes = argTypes;
-								newFunStruct->argTypesLen = lengthOfargTypesArray;
-								key = funcToMap.size();
-								funcToMap[key] = newFunStruct;
+							// 	// Update added
+							// 	added = 1;
+							// }
+							// else { // Not yet registered
+							// 	funcStruct newFunStruct;// = (struct funcStruct*)malloc(sizeof (struct funcStruct));
+							// 	newFunStruct.funcName = funcName;
+							// 	newFunStruct.argTypes = argTypes;
+							// 	newFunStruct.argTypesLen = lengthOfargTypesArray;
+							// 	key = funcToMap.size();
+							// 	funcToMap.insert ( std::pair<int, funcStruct>(key,newFunStruct) );
+							// 	//std::map<int, funcStruct> funcToMap;
+							// 	//funcToMap[key] = newFunStruct; /// WROOOOOONNNNNGGG
 
-								// It doesn't exist, add it
-								std::vector <std::string> addThisValue;
-								addThisValue.push_back(serverLocValue);
-								binderDatabaseStr[key]= addThisValue;
+							// 	// It doesn't exist, add it
+							// 	std::vector <std::string> addThisValue;
+							// 	addThisValue.push_back(serverLocValue);
+							// 	binderDatabaseStr[key]= addThisValue;
 								
-								// Update added
-								added = 1;
-							}
+							// 	// Update added
+							// 	added = 1;
+							// }
+							// --- ....TO HERE!
 
 							// Respond to the server
 							uint32_t responseLength = 4; // Just 4 bytes
@@ -344,7 +369,8 @@ int main() {
 
 							// Send the message length
 							sendInt(i, &responseLength, sizeof(responseLength), 0);
-
+							
+							previouslyAdded = 1; // REMOVE THIS WHEN FIXED
 							if (previouslyAdded == 1 ) {
 								// Respond with REGISTER_SUCCESS as type and PREVIOUSLY_REGISTERED as message
 								responseType = REGISTER_SUCCESS;
