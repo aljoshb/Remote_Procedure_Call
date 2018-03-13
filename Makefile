@@ -15,7 +15,10 @@ rpc.o: rpc.c
 librpc.a: rpc.o communication_functions.o
 	ar rcs $@ $^
 
-test:
+toy:
+	g++ -o toy.o toy.c
+
+test: all
 	g++ -c -o client.o client.c
 	g++ -c -o server_functions.o server_functions.c
 	g++ -c -o server_function_skels.o server_function_skels.c

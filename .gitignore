@@ -1,5 +1,6 @@
 *.o
 *.a
+toy.c
 .DS_Store
 binder
 client
