@@ -345,20 +345,23 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	sendInt(fdServerWithBinder, &messageType, sizeof(messageType), 0);
 
 	// Send the serveridentifier
-	messageLength = strlen(getServerHostName);
+	messageLength = strlen(getServerHostName)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
+	getServerHostName[strlen(getServerHostName)] ='\0';
 	sendMessage(fdServerWithBinder, getServerHostName, messageLength, 0);
 	std::cout<<"Message sent: "<<getServerHostName<<std::endl;
 
 	// Send the port
-	messageLength = strlen(serverPort);
+	messageLength = strlen(serverPort)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
+	serverPort[strlen(serverPort)] ='\0';
 	sendMessage(fdServerWithBinder, serverPort, messageLength, 0);
 	std::cout<<"Message sent: "<<serverPort<<std::endl;
 
 	// Send the funcName
-	messageLength = strlen(name);
+	messageLength = strlen(name)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
+	name[strlen(name)] ='\0';
 	sendMessage(fdServerWithBinder, name, messageLength, 0);
 	std::cout<<"Message sent: "<<name<<std::endl;
 
