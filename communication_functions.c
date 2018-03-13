@@ -1,14 +1,16 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netdb.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <sstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "rpc.h"
 #include "binder.h"
@@ -183,7 +185,18 @@ int connection(const char *destIP, const char *destPort) {
 	return socketfd;
 }
 
+std::string getUniqueFunctionKey(char* funcName, int* argTypes) {
+	std::string cppStr = funcName;
 
+	// loop until we hit the 0 terminator for the argTypes array
+	while (*argTypes) {
+        std::stringstream ss;
+        ss << *argTypes;
+        cppStr += ss.str();
 
+		// increment the pointer to the next int
+		argTypes++;
+    }
 
-
+	return cppStr;
+}
