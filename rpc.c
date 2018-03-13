@@ -322,7 +322,6 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	
 	/* First Register Step: Call the binder and inform it that I have the function procedure called 'name' */
-	
 	uint32_t messageLength;
 	uint32_t messageType = REGISTER;
 

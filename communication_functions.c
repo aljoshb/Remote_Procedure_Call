@@ -79,7 +79,7 @@ int receiveInt(int socketfd, uint32_t *numToReceive, size_t length, int flags) {
 	/* Encountered an error while trying to receive */
 	if (nbytes<=0) {
 		printf("Error while trying to receive. Closing socket....\n");
-		close(socketfd);
+		// close(socketfd);
 	}
 	/* If full message was not received in first receive attempt */
 	else if (nbytes<length) {
@@ -120,7 +120,7 @@ int receiveMessage(int socketfd, char *messageToReceive, size_t length, int flag
 	/* Encountered an error while trying to receive */
 	if (nbytes<=0) {
 		printf("Error while trying to receive. Closing socket....\n");
-		close(socketfd);
+		// close(socketfd);
 	}
 	/* If full message was not received in first receive attempt */
 	else if (nbytes<length) {

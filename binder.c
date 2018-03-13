@@ -121,7 +121,7 @@ int main() {
 	int lastFuncAdded=0;
 
 	/* Dictionary and vector to database */
-	//std::map<std::string, std::vector<std::string> > binderDatabaseStr;
+	std::map<std::string, std::vector<std::string> > binderDatabaseStr2;
 	std::map<int, std::vector<std::string> > binderDatabaseStr;
 
 	int continueRunning = 1;
@@ -131,6 +131,7 @@ int main() {
 
 	/* Dictionary to store the server info */
 	std::map<std::string, struct serverInfo*> serverMap;
+	std::map<std::string, std::string> serverMapStr;
 
 	/* Binder runs forever, accepting connections and processing data until a termination message */
 	while (continueRunning == 1) {
@@ -209,25 +210,25 @@ int main() {
 							std::cout<<"Binder Received registration request...." <<std::endl;
 
 							// Set the server ip, port, function name and argTypes array 
-							char* newServerHostName=(char*)malloc(SERVERIP);
-							char* newServerPort=(char*)malloc(SERVERPORT);
-							char *funcName = (char*)malloc(FUNCNAMELENGTH);
 							
 							// Get the serveridentifier
 							// messageLength = SERVERIP;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char* newServerHostName=(char*)malloc(messageLength);
 							receiveMessage(i, newServerHostName, messageLength, 0);
 							std::cout<<"Message received: "<<newServerHostName<<std::endl;
 
 							// Get the port
 							// messageLength = SERVERPORT;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char* newServerPort=(char*)malloc(messageLength);
 							receiveMessage(i, newServerPort, messageLength, 0);
 							std::cout<<"Message received: "<<newServerPort<<std::endl;
 
 							// Get the funcName
 							// messageLength = FUNCNAMELENGTH;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char *funcName = (char*)malloc(messageLength);
 							receiveMessage(i, funcName, messageLength, 0);
 							std::cout<<"Message received: "<<funcName<<std::endl;
 
@@ -247,6 +248,14 @@ int main() {
 							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
 
 							// Create the funcName and argTypes pair for the dictionary
+							char *funNameAndArgTypes = (char*)malloc(FUNCNAMELENGTH+sizeOfArgTypesArray);
+							memset(funNameAndArgTypes, -1, FUNCNAMELENGTH+sizeOfArgTypesArray);
+							std::cout<<funNameAndArgTypes<<std::endl;
+							std::cout<<strlen(funNameAndArgTypes)<<std::endl;
+							memcpy(funNameAndArgTypes, funcName, strlen(funcName));
+							memcpy(funNameAndArgTypes+strlen(funcName), argTypes, sizeOfArgTypesArray);
+							std::cout<<funNameAndArgTypes<<std::endl;
+							std::cout<<strlen(funNameAndArgTypes)<<std::endl;
 							char *serverIden = (char*)malloc(strlen(newServerHostName)+strlen(newServerPort)+1);
 							memcpy(serverIden, newServerHostName, strlen(newServerHostName));
 							char* delimiter=";";
@@ -254,6 +263,7 @@ int main() {
 							memcpy(serverIden+strlen(newServerHostName)+1, newServerPort, strlen(newServerPort));
 							std::string serverLocValue(serverIden);
 							std::cout<<"new server value: "<<serverLocValue<<std::endl;
+							
 							struct serverInfo *newserverInfo = (struct serverInfo*)malloc(sizeof (struct serverInfo));
 							newserverInfo->sockfd = i;
 							newserverInfo->serverIP = newServerHostName;
