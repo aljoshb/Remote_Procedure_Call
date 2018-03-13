@@ -134,7 +134,7 @@ int main() {
 	int lastFuncAdded=0;
 
 	/* Dictionary and vector to database */
-	// std::map<std::string, std::vector<std::string> > binderDatabaseStr2;
+	std::map<std::string, std::vector<std::string> > binderDatabaseStr2;
 	std::map<int, std::vector<std::string> > binderDatabaseStr;
 	//std::map<int, std::vector<std::string>::iterator dataBaseIterator;
 
@@ -260,6 +260,8 @@ int main() {
 									justInCase+=getLength;
 								}
 							}
+
+
 							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
 
 							// Create the funcName and argTypes pair for the dictionary
@@ -296,8 +298,9 @@ int main() {
 
 							int key;
 							int found=-1;
-							int count=0;
+							
 							for (int k=0;k<funcToMap.size();k++) {
+								int count=0;
 								if (funcToMap.count(k+1)>0 && 
 									strcmp (funcToMap[k+1].funcName, funcName)==0 && 
 									funcToMap[k+1].argTypesLen ==  lengthOfargTypesArray) {
@@ -321,27 +324,27 @@ int main() {
 							}
 
 							// --- BAD FROM HERE....
-							// if (found ==1) { // A server already registered this funcArgTypes
+							if (found ==1 && binderDatabaseStr.count(key)>0) { // A server already registered this funcArgTypes
 
-							// 	// It exists. Check if this server has already been added to the list for this funcArgTypes combo
-							// 	for (int g=0;g<binderDatabaseStr[key].size();g++) {
-							// 		if ( (binderDatabaseStr[key][g]).compare(serverLocValue) == 0 ) { // Already added
+								// It exists. Check if this server has already been added to the list for this specific funcArgTypes combo
+								for (int g=0;g<binderDatabaseStr[key].size();g++) {
+									if ( (binderDatabaseStr[key].at(g)).compare(serverLocValue) == 0 ) { // Already added
 
-							// 			// Update it
-							// 			binderDatabaseStr[key][g] = serverLocValue;
-							// 			previouslyAdded = 1;
+										// Update it
+										//binderDatabaseStr[key].at(g) = serverLocValue;
+										previouslyAdded = 1;
 
-							// 			break;
+										break;
 
-							// 		}
-							// 	}
-							// 	if (previouslyAdded==-1) { // Not yet added
-							// 		binderDatabaseStr[key].push_back(serverLocValue);
-							// 	}
+									}
+								}
+								if (previouslyAdded==-1) { // Not yet added
+									binderDatabaseStr[key].push_back(serverLocValue);
+								}
 
-							// 	// Update added
-							// 	added = 1;
-							// }
+								// Update added
+								added = 1;
+							}
 							// else { // Not yet registered
 							// 	funcStruct newFunStruct;// = (struct funcStruct*)malloc(sizeof (struct funcStruct));
 							// 	newFunStruct.funcName = funcName;
@@ -370,7 +373,7 @@ int main() {
 							// Send the message length
 							sendInt(i, &responseLength, sizeof(responseLength), 0);
 							
-							previouslyAdded = 1; // REMOVE THIS WHEN FIXED
+							//previouslyAdded = 1; // REMOVE THIS WHEN FIXED
 							if (previouslyAdded == 1 ) {
 								// Respond with REGISTER_SUCCESS as type and PREVIOUSLY_REGISTERED as message
 								responseType = REGISTER_SUCCESS;
