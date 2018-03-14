@@ -38,7 +38,8 @@ int fdClientWithBinder = -1;
 // 	skeleton f;
 // };
 
-std::vector<std::string> listOfRegisteredFuncArgTypesNew;
+// std::vector<std::string> listOfRegisteredFuncArgTypesNew;
+std::map<std::string, skeleton> listOfRegisteredFuncArgTypesNew;
 
 int rpcInit() { /*Josh*/
 	
@@ -370,12 +371,18 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	
 	/* Check if this has been previously registered */
 	std::string nameArgTypesCombo = getUniqueFunctionKey(name, argTypes);
-	for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
-		if ((listOfRegisteredFuncArgTypesNew[i]).compare(nameArgTypesCombo) == 0) {
-			printf("binder previously registered this function and argTypes\n");
-			return PREVIOUSLY_REGISTERED;
-		}
+	std::map<std::string, skeleton>::iterator it;
+	it = listOfRegisteredFuncArgTypesNew.find(nameArgTypesCombo);
+	if (it != listOfRegisteredFuncArgTypesNew.end()) { // It is has been registered
+		printf("binder previously registered this function and argTypes\n");
+		return PREVIOUSLY_REGISTERED;
 	}
+	// for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
+	// 	if ((listOfRegisteredFuncArgTypesNew[i]).compare(nameArgTypesCombo) == 0) {
+	// 		printf("binder previously registered this function and argTypes\n");
+	// 		return PREVIOUSLY_REGISTERED;
+	// 	}
+	// }
 
 	/* First Register Step: Call the binder and inform it that I have the function procedure called 'name' */
 	uint32_t messageLength;
@@ -457,7 +464,8 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 			printf("NEW_REGISTRATION\n");
 
 			// Update list
-			listOfRegisteredFuncArgTypesNew.push_back(nameArgTypesCombo);
+			listOfRegisteredFuncArgTypesNew[nameArgTypesCombo] = f;
+			// listOfRegisteredFuncArgTypesNew.push_back(nameArgTypesCombo);
 		}
 	}
 	else if (receiveType == REGISTER_FAILURE) {

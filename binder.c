@@ -301,12 +301,8 @@ int main() {
 							memcpy(serverIden+strlen(newServerHostName)+1, newServerPort, strlen(newServerPort));
 							std::string serverLocValue(serverIden);
 							std::cout<<"new server value: "<<serverLocValue<<std::endl;
-							// std::map<std::string, std::queue<std::string> > binderDatabaseStr2;
-							int added = -1;
-							// int previouslyAdded = -1;
 
-							// int key;
-							// int found=-1;
+							int added = -1;
 
 							// Check if this funcArgTypes combo exists yet
 							std::map<std::string, std::queue<std::string> >::iterator it;
