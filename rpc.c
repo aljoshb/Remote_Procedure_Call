@@ -595,6 +595,35 @@ int rpcExecute() { /*Jk*/
 							close(i);
 							FD_CLR(i, &master_fd);
 						}
+
+						// message is not empty, safe to read
+						else {
+							// message format from rpcCall
+							// length, char* funcName
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char funcName[messageLength / sizeof(char)];
+							receiveMessage(i, funcName, messageLength, 0);
+							
+							// length, int* argTypes
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char argTypesChar[messageLength / sizeof(char)];
+							receiveMessage(i, argTypesChar, messageLength, 0);
+							int* argTypes = (int*) argTypesChar;
+							
+							// length, void** args
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char argsChar[messageLength / sizeof(char)];
+							receiveMessage(i, argsChar, messageLength, 0);
+							void** args = (void**) argsChar;
+							
+							std::cout << "Received request for: " << getUniqueFunctionKey(funcName, argTypes) << std::endl;
+
+							// skeleton returns 0, success
+								// reply with EXECUTE_SUCCESS, name, argTypes, args
+							
+							// skeleton returns non-zero, failure
+								// reply with EXECUTE_FAILURE, reasonCode
+						}
 						
 						free(message);
 					}
