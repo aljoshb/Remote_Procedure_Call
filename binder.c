@@ -141,6 +141,9 @@ int main() {
 
 	int continueRunning = 1;
 
+	/* Store the servers file descriptors */
+	std::vector<int> serverFds;
+
 	/* Dictionary to store int to funcArgTypes mapping */
 	// std::map<int, funcStruct> funcToMap;
 
@@ -202,16 +205,24 @@ int main() {
 						continueRunning = 0;
 
 						// Inform all the servers
-						for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
-							if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
+						// for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
+						// 	if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
 								
-								// Send the length
-								sendInt(i, &messageLength, sizeof(messageLength), 0);
+						// 		// Send the length
+						// 		sendInt(i, &messageLength, sizeof(messageLength), 0);
 
-								// Send the message (Just the type: TERMINATE)
-								sendInt(i, &messageType, sizeof(messageType), 0);
+						// 		// Send the message (Just the type: TERMINATE)
+						// 		sendInt(i, &messageType, sizeof(messageType), 0);
 
-							}
+						// 	}
+						// }
+						for (int fd=0; fd<serverFds.size(); fd++) { // Send to the servers
+
+							// Send the length
+							sendInt(serverFds.at(fd), &messageLength, sizeof(messageLength), 0);
+
+							// Send the message (Just the type: TERMINATE)
+							sendInt(serverFds.at(fd), &messageType, sizeof(messageType), 0);
 						}
 						// Exit
 						break;
@@ -222,6 +233,20 @@ int main() {
 					else {
 
 						if (messageType == REGISTER) {
+
+							// Add this server's file descriptor to the list
+							int u;
+							for (u=0;u<serverFds.size();u++) {
+								if (serverFds.at(u)==i) {
+									// Already added
+									break;
+								}
+							}
+							if (u==serverFds.size()) {
+								// Not added yet
+								serverFds.push_back(i);
+							}
+
 							std::cout<<"Binder Received registration request...." <<std::endl;
 
 							// Set the server ip, port, function name and argTypes array 
