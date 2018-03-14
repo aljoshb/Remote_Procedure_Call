@@ -17,6 +17,7 @@ librpc.a: rpc.o communication_functions.o
 
 toy:
 	g++ -o toy.o toy.c
+	./toy.o
 
 test: all
 	g++ -c -o client.o client.c
