@@ -151,6 +151,27 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 	sizeOfargTypesArray = lengthOfargTypesArray * sizeof(int);
 
+	// We don't want to care about the specific length of an array argument when request a function
+	int* argTypesToSend = (int*)malloc(sizeOfargTypesArray);
+	int totalBytesOfArgs = 0;
+
+		for (int i=0; i<lengthOfargTypesArray; i++) {
+			int inputOutInfo = *(argTypes+i) >> 24 & 0xff; // The 1st byte from the left
+			int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+			int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
+
+			if (lenAtI==0) { // This argument is not an array
+
+				// No need to update argTypes at this location, its the same
+				*(argTypesToSend+i) = *(argTypes+i);
+			}
+			else {
+
+				// Update argTypes at this location
+				*(argTypesToSend+i) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
+			}
+	}
+
 	uint32_t messageLength;
 	uint32_t messageType = LOC_REQUEST;
 
@@ -169,7 +190,8 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 	// Send the argTypes
 	messageLength = sizeOfargTypesArray;
 	sendInt(fdClientWithBinder, &messageLength, sizeof(messageLength), 0);
-	int sendLength = send(fdClientWithBinder, argTypes, sizeOfargTypesArray, 0);
+	// int sendLength = send(fdClientWithBinder, argTypes, sizeOfargTypesArray, 0);
+	int sendLength = send(fdClientWithBinder, argTypesToSend, sizeOfargTypesArray, 0);
 	/* If full message was not sent in first send attempt */
 	if (sendLength!=messageLength) {
 		int justInCase=sendLength;
@@ -178,7 +200,7 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			justInCase+=sendLength;
 		}
 	}
-	std::cout<<"Message sent: "<<argTypes[0]<<std::endl;
+	std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
 
 	/* Receive response back from the binder */
 	uint32_t binderResponseLen;
@@ -369,21 +391,6 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	
-	/* Check if this has been previously registered */
-	std::string nameArgTypesCombo = getUniqueFunctionKey(name, argTypes);
-	std::map<std::string, skeleton>::iterator it;
-	it = listOfRegisteredFuncArgTypesNew.find(nameArgTypesCombo);
-	if (it != listOfRegisteredFuncArgTypesNew.end()) { // It is has been registered
-		printf("binder previously registered this function and argTypes\n");
-		return PREVIOUSLY_REGISTERED;
-	}
-	// for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
-	// 	if ((listOfRegisteredFuncArgTypesNew[i]).compare(nameArgTypesCombo) == 0) {
-	// 		printf("binder previously registered this function and argTypes\n");
-	// 		return PREVIOUSLY_REGISTERED;
-	// 	}
-	// }
-
 	/* First Register Step: Call the binder and inform it that I have the function procedure called 'name' */
 	uint32_t messageLength;
 	uint32_t messageType = REGISTER;
@@ -399,8 +406,43 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 		}
 		i++;
 	}
-
 	sizeOfargTypesArray = lengthOfargTypesArray * sizeof(int);
+
+	// We don't want to care about the specific length of an array argument when registering a function
+	int* argTypesToSend = (int*)malloc(sizeOfargTypesArray);
+	int totalBytesOfArgs = 0;
+
+		for (int i=0; i<lengthOfargTypesArray; i++) {
+			int inputOutInfo = *(argTypes+i) >> 24 & 0xff; // The 1st byte from the left
+			int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+			int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
+
+			if (lenAtI==0) { // This argument is not an array
+
+				// No need to update argTypes at this location, its the same
+				*(argTypesToSend+i) = *(argTypes+i);
+			}
+			else {
+
+				// Update argTypes at this location
+				*(argTypesToSend+i) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
+			}
+	}
+
+	/* Check if this has been previously registered */
+	std::string nameArgTypesCombo = getUniqueFunctionKey(name, argTypesToSend);//argTypes);
+	std::map<std::string, skeleton>::iterator it;
+	it = listOfRegisteredFuncArgTypesNew.find(nameArgTypesCombo);
+	if (it != listOfRegisteredFuncArgTypesNew.end()) { // It is has been registered
+		printf("binder previously registered this function and argTypes\n");
+		return PREVIOUSLY_REGISTERED;
+	}
+	// for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
+	// 	if ((listOfRegisteredFuncArgTypesNew[i]).compare(nameArgTypesCombo) == 0) {
+	// 		printf("binder previously registered this function and argTypes\n");
+	// 		return PREVIOUSLY_REGISTERED;
+	// 	}
+	// }
 
 	// Send the type
 	messageLength = sizeof(messageType);
@@ -431,16 +473,18 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	// Send the argTypes
 	messageLength = sizeOfargTypesArray;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0);
-	int sendLength = send(fdServerWithBinder, argTypes, sizeOfargTypesArray, 0);
+	// int sendLength = send(fdServerWithBinder, argTypes, sizeOfargTypesArray, 0);
+	int sendLength = send(fdServerWithBinder, argTypesToSend, sizeOfargTypesArray, 0);
 	/* If full message was not sent in first send attempt */
 	if (sendLength!=messageLength) {
 		int justInCase=sendLength;
 		while (justInCase<=messageLength) {
-			sendLength = send(fdServerWithBinder, argTypes+sendLength, messageLength-sendLength, 0);
+			// sendLength = send(fdServerWithBinder, argTypes+sendLength, messageLength-sendLength, 0);
+			sendLength = send(fdServerWithBinder, argTypesToSend+sendLength, messageLength-sendLength, 0);
 			justInCase+=sendLength;
 		}
 	}
-	std::cout<<"Message sent: "<<argTypes[0]<<std::endl;
+	std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
 
 
 	std::cout<<"Registration message sent to the binder"<<std::endl;
