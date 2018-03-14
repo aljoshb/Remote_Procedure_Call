@@ -480,10 +480,6 @@ int rpcExecute() { /*Jk*/
 		fprintf(stderr, "error while trying to listen\n");
 	}
 	
-	// if (listen(fdServerWithBinder, BACKLOG) == -1) { //---------Josh
-	// 	fprintf(stderr, "error while trying to listen\n");
-	// }
-
 	// set up for select
 	fd_set master_fd;
 	fd_set read_fds;
@@ -526,16 +522,12 @@ int rpcExecute() { /*Jk*/
 		// Once select returns, loop through the file descriptor list
 		for (int i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &read_fds)) {
-				if (i == fdServerWithClient/* || i == fdServerWithBinder*/) { // Received a new connection request //---------Josh
+				if (i == fdServerWithClient) { // Received a new connection request
 					addrlen = sizeof remoteaddr;
 
 					if (i == fdServerWithClient) {
 						newfd = accept(fdServerWithClient, (struct sockaddr *)&remoteaddr, &addrlen);
 					}
-
-					// else if (i == fdServerWithBinder) { //---------Josh
-					// 	newfd = accept(fdServerWithBinder, (struct sockaddr *)&remoteaddr, &addrlen);
-					// }
 					
 					if (newfd == -1) {
 						perror("error when accepting new connection\n");
@@ -550,7 +542,13 @@ int rpcExecute() { /*Jk*/
 						}
 					}
 				}
-				else if (i == fdServerWithBinder) { // Must be a termination request//---------Josh
+				else if (i == fdServerWithBinder) { // binder only sends termination messages to server
+					// First, get the length of the incoming message
+					receiveInt(i, &messageLength, sizeof(messageLength), 0);
+
+					// Next, get the type of the incoming message
+					receiveInt(i, &messageType, sizeof(messageType), 0);
+					
 					// handle termination
 					if (messageType == TERMINATE) {
 						// check if termination from binder
@@ -569,18 +567,8 @@ int rpcExecute() { /*Jk*/
 					// Next, get the type of the incoming message
 					receiveInt(i, &messageType, sizeof(messageType), 0);
 
-					// // handle termination ---------Josh
-					// if (messageType == TERMINATE) {
-					// 	// check if termination from binder
-					// 	const char *hostname = getenv("BINDER_ADDRESS");
-					// 	const char *portStr = getenv("BINDER_PORT");
-						
-					// 	isRunning = 0;
-					// 	break;
-					// }
-
 					// forward request to skeleton
-					/*else */if (messageType == EXECUTE) { //---------Josh
+					if (messageType == EXECUTE) {
 						// Allocate the appropriate memory and get the message
 						char *message;
 						message = (char*) malloc(messageLength);
@@ -599,9 +587,7 @@ int rpcExecute() { /*Jk*/
 							close(i);
 							FD_CLR(i, &master_fd);
 						}
-						else {
-
-						}
+						
 						free(message);
 					}
 				}
