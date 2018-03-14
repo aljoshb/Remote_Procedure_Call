@@ -189,11 +189,16 @@ int main() {
 				else { // Received data from an existing connection
 					std::cout<<"Binder Accepted Data...." <<std::endl;
 					// First, get the length of the incoming message
-					receiveInt(i, &messageLength, sizeof(messageLength), 0);
+					int retL=receiveInt(i, &messageLength, sizeof(messageLength), 0);
+					if (retL==-1) {
+						close(i);
+						FD_CLR(i, &master_fd);
+						break;
+					}
 					std::cout<<"Message length: " <<messageLength<<std::endl;
 					// Allocate the appropriate memory and get the message
-					char *message;
-					message = (char*) malloc (messageLength);
+					// char *message;
+					// message = (char*) malloc (messageLength);
 
 					// Next, get the type of the incoming message
 					receiveInt(i, &messageType, sizeof(messageType), 0);
@@ -460,17 +465,9 @@ int main() {
 							//free(funcArgTypesToFind);
 						}
 
-						// If error or no data, close socket with this client or server
-						if (nbytes <= 0) {
-							close(i);
-							FD_CLR(i, &master_fd);
-						}
-						else {
-
-						}
 					}	
 
-					free(message);
+					// free(message);
 				}
 			}
 		}
