@@ -256,25 +256,6 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			}
 		}
 
-		// Create message to send to the server received from binder. EXECUTE, char* name, int* argTypes, void** args
-		char* messageArgsToServer = (char*)malloc(totalBytesOfArgs+1);
-		messageArgsToServer[totalBytesOfArgs] ='\0';
-		int lastCopied=0;
-		for (int i=0; i<lengthOfargArray; i++) {
-			int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
-			int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
-			int sizeAtI = getTypeSize(typeAtI);
-
-			if (lenAtI==0) { // This argument is not an array
-				memcpy(messageArgsToServer+lastCopied, *(args+i), sizeAtI);
-				lastCopied = sizeAtI;
-			}
-			else {
-				memcpy(messageArgsToServer+lastCopied, *(args+i), lenAtI*sizeAtI);
-				lastCopied = lenAtI*sizeAtI;
-			}
-		}
-
 		// Send the type
 		messageLength = sizeof(messageTypeServer);
 		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
@@ -301,11 +282,68 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		}
 		std::cout<<"Message sent to server: "<<argTypes[0]<<std::endl;
 
-		// Send the args
-		messageLength = totalBytesOfArgs+1;
-		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
-		sendMessage(fdClientWithServer, messageArgsToServer, messageLength, 0);
-		std::cout<<"Message sent to server: "<<messageArgsToServer<<std::endl;
+		// Send the args. Each element in args one at a time
+
+		// First send the total expected length of the args array to the server
+		uint32_t lenArgs = (uint32_t)lengthOfargArray;
+		sendInt(fdClientWithServer, &lenArgs, sizeof(lenArgs), 0);
+
+		// Then send each element of **args individually
+		for (int i=0; i<lengthOfargArray; i++) {
+			uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
+			uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+			uint32_t sizeAtI = getTypeSize(typeAtI);
+
+			if (lenAtI==0) { // This argument is not an array
+
+				// Send its length
+				messageLength = sizeAtI;
+				sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
+
+				// Send its Type
+				sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
+
+				// Send the actual scalar
+				sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
+				
+			}
+			else {
+
+				// Send its length
+				messageLength = lenAtI*sizeAtI;
+				sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
+
+				// Send its Type
+				sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
+
+				// Send the actual scalar
+				sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
+				
+			}
+		}
+		// Create message to send to the server received from binder
+		// char* messageArgsToServer = (char*)malloc(totalBytesOfArgs+1);
+		// messageArgsToServer[totalBytesOfArgs] ='\0';
+		// int lastCopied=0;
+		// for (int i=0; i<lengthOfargArray; i++) {
+		// 	int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
+		// 	int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+		// 	int sizeAtI = getTypeSize(typeAtI);
+
+		// 	if (lenAtI==0) { // This argument is not an array
+		// 		memcpy(messageArgsToServer+lastCopied, *(args+i), sizeAtI);
+		// 		lastCopied = sizeAtI;
+		// 	}
+		// 	else {
+		// 		memcpy(messageArgsToServer+lastCopied, *(args+i), lenAtI*sizeAtI);
+		// 		lastCopied = lenAtI*sizeAtI;
+		// 	}
+		// }
+
+		// messageLength = totalBytesOfArgs+1;
+		// sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
+		// sendMessage(fdClientWithServer, messageArgsToServer, messageLength, 0);
+		// std::cout<<"Message sent to server: "<<messageArgsToServer<<std::endl;
 
 		/* Receive response back from the Server */
 		uint32_t serverResponseLen;
@@ -368,7 +406,7 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 		free(serverIdentifier);
 		free(serverPortNum);
-		free(messageArgsToServer);
+		// free(messageArgsToServer);
 		
 
 	}
