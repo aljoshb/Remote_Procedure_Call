@@ -38,7 +38,7 @@ int fdClientWithBinder = -1;
 // 	skeleton f;
 // };
 
-// std::vector<funcStructServer> listOfRegisteredFuncArgTypesNew;
+std::vector<std::string> listOfRegisteredFuncArgTypesNew;
 
 int rpcInit() { /*Josh*/
 	
@@ -136,11 +136,6 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		fprintf(stderr, "unable to connect with the binder\n");
 		return -1;
 	}
-
-	/* Contact the binder to get the location of a server that has 'name' and argTypes */
-	uint32_t messageLenBinder;
-	uint32_t messageTypeBinder = LOC_REQUEST;
-
 	// Set the message length
 	int i=0;
 	int sizeOfargTypesArray;
@@ -152,55 +147,75 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		}
 		i++;
 	}
+
 	sizeOfargTypesArray = lengthOfargTypesArray * sizeof(int);
-	messageLenBinder = FUNCNAMELENGTH + sizeOfargTypesArray;
 
-	// Prepare the message
-	char* message = (char*)malloc(messageLenBinder);
-	memset(message, 0, FUNCNAMELENGTH); // Pad with zeroes first
-	memcpy(message, name, strlen(name));
-	memcpy(message+FUNCNAMELENGTH, argTypes, sizeOfargTypesArray);
+	uint32_t messageLength;
+	uint32_t messageType = LOC_REQUEST;
 
-	// Send the message length
-	sendInt(fdClientWithBinder, &messageLenBinder, sizeof(messageLenBinder), 0);
-	
-	// Send the message type
-	sendInt(fdClientWithBinder, &messageTypeBinder, sizeof(messageTypeBinder), 0);
-	// Send the actual message
-	sendMessage(fdClientWithBinder, message, messageLenBinder, 0);
+	// Send the type
+	messageLength = sizeof(messageType);
+	sendInt(fdClientWithBinder, &messageLength, sizeof(messageLength), 0);
+	sendInt(fdClientWithBinder, &messageType, messageLength, 0);
+	std::cout<<"Message sent: "<<messageType<<std::endl;
 
-	// Free message
-	free(message);
+	// Send the funcName
+	messageLength = strlen(name)+1;
+	sendInt(fdClientWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
+	sendMessage(fdClientWithBinder, name, messageLength, 0);
+	std::cout<<"Message sent: "<<name<<std::endl;
+
+	// Send the argTypes
+	messageLength = sizeOfargTypesArray;
+	sendInt(fdClientWithBinder, &messageLength, sizeof(messageLength), 0);
+	int sendLength = send(fdClientWithBinder, argTypes, sizeOfargTypesArray, 0);
+	/* If full message was not sent in first send attempt */
+	if (sendLength!=messageLength) {
+		int justInCase=sendLength;
+		while (justInCase<=messageLength) {
+			sendLength = send(fdClientWithBinder, argTypes+sendLength, messageLength-sendLength, 0);
+			justInCase+=sendLength;
+		}
+	}
+	std::cout<<"Message sent: "<<argTypes[0]<<std::endl;
 
 	/* Receive response back from the binder */
 	uint32_t binderResponseLen;
 	uint32_t binderResponseType;
-	char* binderPositiveResponse = (char*)malloc(SERVERIP+SERVERPORT);
 	uint32_t binderNegativeResponse;
 
-	// Get the length
+	// Get the type
 	receiveInt(fdClientWithBinder, &binderResponseLen, sizeof(binderResponseLen), 0);
-
-	// Get the message type
-	receiveInt(fdClientWithBinder, &binderResponseType, sizeof(binderResponseType), 0);
-
-	// Get the message
+	receiveInt(fdClientWithBinder, &binderResponseType, binderResponseLen, 0);
+	
+	
 	if (binderResponseType == LOC_SUCCESS) {
-		receiveMessage(fdClientWithBinder, binderPositiveResponse, binderResponseLen, 0);
+
+		std::cout<<"LOC_SUCCESS!"<<std::endl;
+
+		// Get the server identifier
+		receiveInt(fdClientWithBinder, &binderResponseLen, sizeof(binderResponseLen), 0);
+		char* serverIdentifier = (char*)malloc(binderResponseLen);
+		receiveMessage(fdClientWithBinder, serverIdentifier, binderResponseLen, 0);
+		std::cout<<"Server IP Received: "<<serverIdentifier<<std::endl;
+
+		// Get the server port
+		receiveInt(fdClientWithBinder, &binderResponseLen, sizeof(binderResponseLen), 0);
+		char* serverPortNum = (char*)malloc(binderResponseLen);
+		receiveMessage(fdClientWithBinder, serverPortNum, binderResponseLen, 0);
+		std::cout<<"Server Port Received: "<<serverPortNum<<std::endl;
+
 
 		/* Now contact the server gotten from the binder */
-		char* serverIP = (char*)malloc(SERVERIP);
-		char* serverPortLoc = (char*)malloc(SERVERPORT);
-		memcpy(serverIP, binderPositiveResponse, SERVERIP);
-		memcpy(serverPortLoc, binderPositiveResponse+SERVERIP, SERVERPORT);
-
-		int fdClientWithServer = connection(serverIP, serverPortLoc);
+		int fdClientWithServer = connection(serverIdentifier, serverPortNum);
 		if (fdClientWithServer<0) {
 			fprintf(stderr, "unable to connect with the binder\n");
 			return -1;
 		}
-		uint32_t messageLenServer;
+
+		// Prepare **args
 		uint32_t messageTypeServer = EXECUTE;
+
 		int lengthOfargArray = lengthOfargTypesArray - 1;
 		int totalBytesOfArgs = 0;
 
@@ -219,7 +234,8 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		}
 
 		// Create message to send to the server received from binder. EXECUTE, char* name, int* argTypes, void** args
-		char* messageArgsToServer = (char*)malloc(totalBytesOfArgs);
+		char* messageArgsToServer = (char*)malloc(totalBytesOfArgs+1);
+		messageArgsToServer[totalBytesOfArgs] ='\0';
 		int lastCopied=0;
 		for (int i=0; i<lengthOfargArray; i++) {
 			int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
@@ -236,43 +252,58 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			}
 		}
 
-		// Copy the whole message
-		messageLenServer = FUNCNAMELENGTH + sizeOfargTypesArray + totalBytesOfArgs;
-		char* messageToServer = (char*)malloc(messageLenServer);
-		memset(message, 0, FUNCNAMELENGTH); // Pad with zeroes first
-		memcpy(messageToServer, name, strlen(name));
-		memcpy(messageToServer+FUNCNAMELENGTH, argTypes, sizeOfargTypesArray);
-		memcpy(messageToServer+FUNCNAMELENGTH+sizeOfargTypesArray, messageArgsToServer, totalBytesOfArgs);
+		// Send the type
+		messageLength = sizeof(messageTypeServer);
+		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
+		sendInt(fdClientWithServer, &messageTypeServer, messageLength, 0);
+		std::cout<<"Message sent to server: "<<messageTypeServer<<std::endl;
 
-		// Send the length
-		sendInt(fdClientWithServer, &messageLenServer, sizeof(messageLenServer), 0);
+		// Send the funcName
+		messageLength = strlen(name)+1;
+		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0); // It's own length
+		sendMessage(fdClientWithServer, name, messageLength, 0);
+		std::cout<<"Message sent to server: "<<name<<std::endl;
 
-		// Send the message type
-		sendInt(fdClientWithServer, &messageTypeServer, sizeof(messageTypeServer), 0);
+		// Send the argTypes
+		messageLength = sizeOfargTypesArray;
+		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
+		int sendLength = send(fdClientWithServer, argTypes, sizeOfargTypesArray, 0);
+		/* If full message was not sent in first send attempt */
+		if (sendLength!=messageLength) {
+			int justInCase=sendLength;
+			while (justInCase<=messageLength) {
+				sendLength = send(fdClientWithServer, argTypes+sendLength, messageLength-sendLength, 0);
+				justInCase+=sendLength;
+			}
+		}
+		std::cout<<"Message sent to server: "<<argTypes[0]<<std::endl;
 
-		// Send the message
-		sendMessage(fdClientWithServer, messageToServer, messageLenServer, 0);
-
-		// Free
-		free(messageToServer);
-		free(messageArgsToServer);
-
+		// Send the args
+		messageLength = totalBytesOfArgs+1;
+		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
+		sendMessage(fdClientWithServer, messageArgsToServer, messageLength, 0);
+		std::cout<<"Message sent to server: "<<messageArgsToServer<<std::endl;
 
 		/* Receive response back from the Server */
 		uint32_t serverResponseLen;
 		uint32_t serverResponseType;
-		char* serverPositiveResponse = (char*)malloc(messageLenServer);/*Length of char *name+int *argTypes+ void **args */
+		// char* serverPositiveResponse = (char*)malloc(messageLenServer);/*Length of char *name+int *argTypes+ void **args */
 		uint32_t serverNegativeResponse;
 
-		// Get the length
-		receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
+		// Get the type
+		// receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0); /-------Uncomment this when rpcExecute is done
+		// receiveInt(fdClientWithServer, &serverResponseType, serverResponseLen, 0); /-------Uncomment this when rpcExecute is done
 
-		// Get the message type
-		receiveInt(fdClientWithServer, &serverResponseType, sizeof(serverResponseType), 0);
+		serverResponseType = EXECUTE_FAILURE; //-------Remove this when rpcExecute is done!!!!!!!!!!!
 
 		// Get the message
 		if (serverResponseType == EXECUTE_SUCCESS) {
 
+			// Only get the **args back. Redundant to get name and *argTypes back
+
+			// Get the length of args. Ideally should be same as totalBytesOfArgs+1
+			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
+			char* serverPositiveResponse = (char*)malloc(serverResponseLen);
 			receiveMessage(fdClientWithServer, serverPositiveResponse, serverResponseLen, 0);
 
 			// Put it back into **args
@@ -294,10 +325,14 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 				}
 			}
 
+			free(serverPositiveResponse);
+
 		}
 		else if (serverResponseType == EXECUTE_FAILURE) {
 
-			receiveInt(fdClientWithServer, &serverNegativeResponse, serverResponseLen, 0);
+			// receiveInt(fdClientWithServer, &serverNegativeResponse, sizeof(serverNegativeResponse), 0); /-------Uncomment this when rpcExecute is done
+
+			serverNegativeResponse = SERVER_CANNOT_HANDLE_REQUEST; //-------Remove this when rpcExecute is done!!!!!!!!!!!
 
 			if (serverNegativeResponse == SERVER_CANNOT_HANDLE_REQUEST) {
 				printf("server does not have this procedure\n");
@@ -307,7 +342,11 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			}
 		}
 
-		free(serverPositiveResponse);
+
+		free(serverIdentifier);
+		free(serverPortNum);
+		free(messageArgsToServer);
+		
 
 	}
 	else if (binderResponseType == LOC_FAILURE) {
@@ -320,13 +359,24 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 	}
 
-	free(binderPositiveResponse);
+	else {
+		printf("Received nothing!\n");
+	}
 	
 	return 0;
 }
 
 int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	
+	/* Check if this has been previously registered */
+	std::string nameArgTypesCombo = getUniqueFunctionKey(name, argTypes);
+	for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
+		if ((listOfRegisteredFuncArgTypesNew[i]).compare(nameArgTypesCombo) == 0) {
+			printf("binder previously registered this function and argTypes\n");
+			return PREVIOUSLY_REGISTERED;
+		}
+	}
+
 	/* First Register Step: Call the binder and inform it that I have the function procedure called 'name' */
 	uint32_t messageLength;
 	uint32_t messageType = REGISTER;
@@ -351,23 +401,23 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	sendInt(fdServerWithBinder, &messageType, messageLength, 0);
 
 	// Send the serveridentifier
-	messageLength = strlen(getServerHostName);//+1;
+	messageLength = strlen(getServerHostName)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
-	//getServerHostName[strlen(getServerHostName)] ='\0';
+	getServerHostName[strlen(getServerHostName)] ='\0';
 	sendMessage(fdServerWithBinder, getServerHostName, messageLength, 0);
 	std::cout<<"Message sent: "<<getServerHostName<<std::endl;
 
 	// Send the port
-	messageLength = strlen(serverPort);//+1;
+	messageLength = strlen(serverPort)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
-	//serverPort[strlen(serverPort)] ='\0';
+	serverPort[strlen(serverPort)] ='\0';
 	sendMessage(fdServerWithBinder, serverPort, messageLength, 0);
 	std::cout<<"Message sent: "<<serverPort<<std::endl;
 
 	// Send the funcName
-	messageLength = strlen(name);//+1;
+	messageLength = strlen(name)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
-	//name[strlen(name)] ='\0';
+	// name[strlen(name)] ='\0';
 	sendMessage(fdServerWithBinder, name, messageLength, 0);
 	std::cout<<"Message sent: "<<name<<std::endl;
 
@@ -403,20 +453,11 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 
 	/* Second Register Step: Associate the server skeleton with the name and list of args */
 	if (receiveType == REGISTER_SUCCESS) {
-		printf("HEREEEE\n");
-		if (responseMessage == PREVIOUSLY_REGISTERED) {
-			printf("PREVIOUSLY_REGISTERED\n");
-			printf("binder previously registered this function and argTypes\n");
-		}
-		else if (responseMessage == NEW_REGISTRATION) {
+		if (responseMessage == NEW_REGISTRATION) {
 			printf("NEW_REGISTRATION\n");
 
-			// funcStructServer newReg;
-			// newReg.funcName = name;
-			// newReg.argTypes = argTypes;
-			// newReg.f = f;
-
-			// listOfRegisteredFuncArgTypesNew[listOfRegisteredFuncArgTypesNew.size()];
+			// Update list
+			listOfRegisteredFuncArgTypesNew.push_back(nameArgTypesCombo);
 		}
 	}
 	else if (receiveType == REGISTER_FAILURE) {
@@ -424,6 +465,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 		if (responseMessage == BINDER_UNABLE_TO_REGISTER) {
 			perror("binder unable to register\n");
 		}
+		return BINDER_UNABLE_TO_REGISTER;
 	}
 
 

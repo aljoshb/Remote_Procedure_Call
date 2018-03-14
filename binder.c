@@ -15,6 +15,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <queue>
 
 #include "rpc.h"
 #include "binder.h"
@@ -134,17 +135,17 @@ int main() {
 	int lastFuncAdded=0;
 
 	/* Dictionary and vector to database */
-	std::map<std::string, std::vector<std::string> > binderDatabaseStr2;
-	std::map<int, std::vector<std::string> > binderDatabaseStr;
+	std::map<std::string, std::queue<std::string> > binderDatabaseStr2;
+	// std::map<int, std::vector<std::string> > binderDatabaseStr;
 	//std::map<int, std::vector<std::string>::iterator dataBaseIterator;
 
 	int continueRunning = 1;
 
 	/* Dictionary to store int to funcArgTypes mapping */
-	std::map<int, funcStruct> funcToMap;
+	// std::map<int, funcStruct> funcToMap;
 
 	/* Dictionary to store the server info */
-	std::map<std::string, serverInfo> serverMap;
+	// std::map<std::string, serverInfo> serverMap;
 	
 	// std::map<std::string, std::string> serverMapStr;
 
@@ -219,7 +220,6 @@ int main() {
 
 					// REGISTRATION OR LOC_REQUEST
 					else {
-						std::cout<<"Either REGISTER or LOC_REQUEST received"<<std::endl;
 
 						if (messageType == REGISTER) {
 							std::cout<<"Binder Received registration request...." <<std::endl;
@@ -264,106 +264,44 @@ int main() {
 
 							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
 
-							// Create the funcName and argTypes pair for the dictionary
-							// char *funNameAndArgTypes = (char*)malloc(FUNCNAMELENGTH+sizeOfArgTypesArray);
-							// memset(funNameAndArgTypes, -1, FUNCNAMELENGTH+sizeOfArgTypesArray);
-							// std::cout<<funNameAndArgTypes<<std::endl;
-							// std::cout<<strlen(funNameAndArgTypes)<<std::endl;
-							// memcpy(funNameAndArgTypes, funcName, strlen(funcName));
-							// memcpy(funNameAndArgTypes+strlen(funcName), argTypes, sizeOfArgTypesArray);
-							// std::cout<<funNameAndArgTypes<<std::endl;
-							// std::cout<<strlen(funNameAndArgTypes)<<std::endl;
+							// Get the potential key
+							std::string keyFuncArgTypes = getUniqueFunctionKey(funcName, argTypes);
+							std::cout<<"Key for new registration: "<<keyFuncArgTypes<<std::endl;
 
-							char *serverIden = (char*)malloc(strlen(newServerHostName)+strlen(newServerPort)+1);
+							char *serverIden = (char*)malloc(strlen(newServerHostName)+strlen(newServerPort)+2);
+							memset(serverIden,0,strlen(newServerHostName)+strlen(newServerPort)+2);
 							memcpy(serverIden, newServerHostName, strlen(newServerHostName));
 							char* delimiter=";";
 							memcpy(serverIden+strlen(newServerHostName), delimiter, 1); // Divide the server ip and port by ';'
 							memcpy(serverIden+strlen(newServerHostName)+1, newServerPort, strlen(newServerPort));
 							std::string serverLocValue(serverIden);
 							std::cout<<"new server value: "<<serverLocValue<<std::endl;
-							
-							serverInfo newserverInfo;// = (struct serverInfo*)malloc(sizeof (struct serverInfo));
-							newserverInfo.sockfd = i;
-							newserverInfo.serverIP = newServerHostName;
-							newserverInfo.serverPort = newServerPort;
-							std::map<std::string, serverInfo>::iterator it;
-							it = serverMap.find(serverLocValue);
-							if (it == serverMap.end()) {
-								serverMap.insert ( std::pair<std::string, serverInfo>(serverLocValue,newserverInfo) );
-							}
-							
-							
+							// std::map<std::string, std::queue<std::string> > binderDatabaseStr2;
 							int added = -1;
-							int previouslyAdded = -1;
+							// int previouslyAdded = -1;
 
-							int key;
-							int found=-1;
-							
-							for (int k=0;k<funcToMap.size();k++) {
-								int count=0;
-								if (funcToMap.count(k+1)>0 && 
-									strcmp (funcToMap[k+1].funcName, funcName)==0 && 
-									funcToMap[k+1].argTypesLen ==  lengthOfargTypesArray) {
+							// int key;
+							// int found=-1;
 
-									for (int h=0; h<funcToMap[k+1].argTypesLen; h++) {
-										if (funcToMap[k+1].argTypes[h]==argTypes[h]) {
-											count +=1;
-										}
-										else {
-											count-=1;
-										}
-									}
-								}
+							// Check if this funcArgTypes combo exists yet
+							std::map<std::string, std::queue<std::string> >::iterator it;
+							it = binderDatabaseStr2.find(keyFuncArgTypes);
+							if (it == binderDatabaseStr2.end()) { // It does not exist
 
-								if (count == funcToMap[k+1].argTypesLen) {
-									key = k+1;
-									found = 1;
-									break;
-								}
-								
-							}
-
-							// --- BAD FROM HERE....
-							if (found ==1 && binderDatabaseStr.count(key)>0) { // A server already registered this funcArgTypes
-
-								// It exists. Check if this server has already been added to the list for this specific funcArgTypes combo
-								for (int g=0;g<binderDatabaseStr[key].size();g++) {
-									if ( (binderDatabaseStr[key].at(g)).compare(serverLocValue) == 0 ) { // Already added
-
-										// Update it
-										//binderDatabaseStr[key].at(g) = serverLocValue;
-										previouslyAdded = 1;
-
-										break;
-
-									}
-								}
-								if (previouslyAdded==-1) { // Not yet added
-									binderDatabaseStr[key].push_back(serverLocValue);
-								}
+								std::queue<std::string> newListVec;
+								newListVec.push(serverLocValue);
+								binderDatabaseStr2.insert( std::pair<std::string, std::queue<std::string> >(keyFuncArgTypes,newListVec) );
 
 								// Update added
 								added = 1;
 							}
-							// else { // Not yet registered
-							// 	funcStruct newFunStruct;// = (struct funcStruct*)malloc(sizeof (struct funcStruct));
-							// 	newFunStruct.funcName = funcName;
-							// 	newFunStruct.argTypes = argTypes;
-							// 	newFunStruct.argTypesLen = lengthOfargTypesArray;
-							// 	key = funcToMap.size();
-							// 	funcToMap.insert ( std::pair<int, funcStruct>(key,newFunStruct) );
-							// 	//std::map<int, funcStruct> funcToMap;
-							// 	//funcToMap[key] = newFunStruct; /// WROOOOOONNNNNGGG
+							else { // It exists
 
-							// 	// It doesn't exist, add it
-							// 	std::vector <std::string> addThisValue;
-							// 	addThisValue.push_back(serverLocValue);
-							// 	binderDatabaseStr[key]= addThisValue;
+								binderDatabaseStr2[keyFuncArgTypes].push(serverLocValue);
 								
-							// 	// Update added
-							// 	added = 1;
-							// }
-							// --- ....TO HERE!
+								// Update added
+								added = 1;
+							}
 
 							// Respond to the server
 							uint32_t responseLength = 4; // Just 4 bytes
@@ -372,22 +310,8 @@ int main() {
 
 							// Send the message length
 							sendInt(i, &responseLength, sizeof(responseLength), 0);
-							
-							//previouslyAdded = 1; // REMOVE THIS WHEN FIXED
-							if (previouslyAdded == 1 ) {
-								// Respond with REGISTER_SUCCESS as type and PREVIOUSLY_REGISTERED as message
-								responseType = REGISTER_SUCCESS;
-								responseMessage = PREVIOUSLY_REGISTERED;
 
-								// Send the message Type
-								sendInt(i, &responseType, sizeof(responseType), 0);
-
-								// Send the message
-								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
-
-
-							}
-							else if (added ==1) {
+							if (added ==1) {
 								// Respond with REGISTER_SUCCESS as type and NEW_REGISTRATION as message
 								responseType = REGISTER_SUCCESS;
 								responseMessage = NEW_REGISTRATION;
@@ -409,7 +333,6 @@ int main() {
 								// Send the message
 								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
 								
-
 							}
 
 							// Free
@@ -422,70 +345,80 @@ int main() {
 						}
 						else if (messageType == LOC_REQUEST) {
 							std::cout<<"Binder Received location request...." <<std::endl;
-							// Set the function name and argTypes array
-							char *funcName = (char*)malloc(FUNCNAMELENGTH);
-							int *argTypes = (int*)malloc(messageLength-FUNCNAMELENGTH);
-							int lengthOfargTypesArray = messageLength-FUNCNAMELENGTH;
-							
-							memcpy(funcName, message, FUNCNAMELENGTH);
-							memcpy(argTypes, message+FUNCNAMELENGTH, lengthOfargTypesArray);
 
-							// Find the ip address and port number of a server that can service the client's request
-							char *funcArgTypesToFind = (char*)malloc(messageLength);
-							memcpy(funcArgTypesToFind, message, messageLength);
-							std::string funcArgTypesToFindKey(funcArgTypesToFind);
+							// Get the funcName
+							// messageLength = FUNCNAMELENGTH;
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							char *funcName = (char*)malloc(messageLength);
+							receiveMessage(i, funcName, messageLength, 0);
+							std::cout<<"Message received: "<<funcName<<std::endl;
+
+							// Get the argTypes
+							receiveInt(i, &messageLength, sizeof(messageLength), 0);
+							int *argTypes = (int*)malloc(messageLength);
+							int sizeOfArgTypesArray = messageLength;
+							int lengthOfargTypesArray = sizeOfArgTypesArray / sizeof(int);
+							int getLength = recv(i, argTypes, messageLength, 0);
+							if (getLength!=messageLength) {
+								int justInCase=getLength;
+								while (justInCase<=messageLength) {
+									getLength = recv(i, argTypes+getLength, messageLength-getLength, 0);
+									justInCase+=getLength;
+								}
+							}
+
+
+							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
+
+							// Get the potential key
+							std::string keyFuncArgTypes = getUniqueFunctionKey(funcName, argTypes);
+							std::cout<<"Key for new registration: "<<keyFuncArgTypes<<std::endl;
 
 							uint32_t responseLength;
 							uint32_t responseType;
-							int key;
 
-							// Check that such a func and argTypes combo exists
-							if (binderDatabaseStr.count(key)>0) {
-								// Respond with the server info
-								responseLength = SERVERIP+SERVERPORT;
+							std::map<std::string, std::queue<std::string> >::iterator it;
+							it = binderDatabaseStr2.find(keyFuncArgTypes);
+							if (it != binderDatabaseStr2.end()) { // It does exist
+
+								std::string serverIdAndPort = binderDatabaseStr2[keyFuncArgTypes].front();
+								binderDatabaseStr2[keyFuncArgTypes].pop();
+								binderDatabaseStr2[keyFuncArgTypes].push(serverIdAndPort);
+
+								// Get the server ip and port
+								std::string delimiter = ";";
+								std::string serverIP = serverIdAndPort.substr(0, serverIdAndPort.find(delimiter));
+								std::string serverPort = serverIdAndPort.substr(serverIdAndPort.find(delimiter)+1, serverIdAndPort.length());
+
+								std::cout<<serverIP<<std::endl;
+								std::cout<<serverPort<<std::endl;
+
+								// std::string str = "string";
+								// char *cstr = new char[str.length() + 1];
+								// strcpy(cstr, str.c_str());
+								char *serverIPchar = new char[serverIP.length() + 1];
+								strcpy(serverIPchar, serverIP.c_str());
+								char *serverPortchar = new char[serverPort.length() + 1];
+								strcpy(serverPortchar, serverPort.c_str());
+
+								// Send the message Type
+								responseLength = sizeof(responseType);
 								responseType = LOC_SUCCESS;
-								std::string serverThatCanHandle;
-								char *serverInfo = (char*)malloc(SERVERIP+SERVERPORT);
+								sendInt(i, &responseLength, sizeof(responseLength), 0);
+								sendInt(i, &responseType, responseLength, 0);
 
-								if (binderDatabaseStr[key].size()==1) {
-									
-									// Only one server can handle it
-									serverThatCanHandle = binderDatabaseStr[key][0];
-									strcpy(serverInfo, serverThatCanHandle.c_str());
+								// Send Server Identifier
+								responseLength = strlen(serverIPchar)+1;
+								sendInt(i, &responseLength, sizeof(responseLength), 0);
+								sendMessage(i, serverIPchar, responseLength, 0);
 
-									// Send the message length
-									sendInt(i, &responseLength, sizeof(responseLength), 0);
-
-									// Send the message Type
-									sendInt(i, &responseType, sizeof(responseType), 0);
-
-									// Send the message
-									sendMessage(i, serverInfo, responseLength, 0);
-								}
-
-								else {
-									// Multiple servers can handle it
-									// Do round robin to find the appropriate server
-
-									// For now, do it trivially and send the first server. 
-									// Yet to implement round robin approach
-									serverThatCanHandle = binderDatabaseStr[key][0];
-									strcpy(serverInfo, serverThatCanHandle.c_str());
-
-									// Send the message length
-									sendInt(i, &responseLength, sizeof(responseLength), 0);
-
-									// Send the message Type
-									sendInt(i, &responseType, sizeof(responseType), 0);
-
-									// Send the message
-									sendMessage(i, serverInfo, responseLength, 0);
-								}
-								
-								free(serverInfo);
+								// Send Sever Port
+								responseLength = strlen(serverPortchar)+1;
+								sendInt(i, &responseLength, sizeof(responseLength), 0);
+								sendMessage(i, serverPortchar, responseLength, 0);
 
 							}
-							else {
+							else { // It does not exist
 								// Respond with LOC_FAILURE and reasonCode
 								responseLength = 4;
 								responseType = LOC_FAILURE;
@@ -503,7 +436,7 @@ int main() {
 							// Free
 							free(funcName);
 							free(argTypes);
-							free(funcArgTypesToFind);
+							//free(funcArgTypesToFind);
 						}
 
 						// If error or no data, close socket with this client or server
@@ -520,11 +453,6 @@ int main() {
 				}
 			}
 		}
-
-		// if (messageType == TERMINATE) {
-		// 	// Break again
-		// 	break;
-		// }
 
 	}
 
