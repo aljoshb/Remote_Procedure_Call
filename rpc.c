@@ -615,53 +615,65 @@ int rpcExecute() { /*Jk*/
 				else { // Received data from an existing connection
 					// First, get the length of the incoming message
 					receiveInt(i, &messageLength, sizeof(messageLength), 0);
+					std::cout << "Received length: " << messageLength << std::endl;
 
 					// Next, get the type of the incoming message
 					receiveInt(i, &messageType, sizeof(messageType), 0);
+					std::cout << "Received type: " << messageType << std::endl;
 
 					// forward request to skeleton
 					if (messageType == EXECUTE) {
 						// Allocate the appropriate memory and get the message
-						char *message;
-						message = (char*) malloc(messageLength);
+						// char *message;
+						// message = (char*) malloc(messageLength);
 
-						nbytes = recv(i, message, messageLength, 0);
-						if (nbytes>=1 && nbytes<messageLength) { // If full message not received
-							int justInCase=nbytes;
-							while (justInCase<=messageLength) {
-								nbytes = recv(i, message+nbytes, messageLength, 0);
-								justInCase+=nbytes;
-							}
-						}
+						// nbytes = recv(i, message, messageLength, 0);
+						// if (nbytes>=1 && nbytes<messageLength) { // If full message not received
+						// 	int justInCase=nbytes;
+						// 	while (justInCase<=messageLength) {
+						// 		nbytes = recv(i, message+nbytes, messageLength, 0);
+						// 		justInCase+=nbytes;
+						// 	}
+						// }
 
 						// If error or no data, close socket with this client or server
-						if (nbytes <= 0) {
-							close(i);
-							FD_CLR(i, &master_fd);
-						}
+						// if (nbytes <= 0) {
+						// 	close(i);
+						// 	FD_CLR(i, &master_fd);
+						// }
+
+						if (0) {}
 
 						// message is not empty, safe to read
 						else {
 							// message format from rpcCall
 							// length, char* funcName
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
-							char funcName[messageLength / sizeof(char)];
+							char funcName[messageLength];
 							receiveMessage(i, funcName, messageLength, 0);
+							std::cout << "Received: " << funcName << std::endl;
 							
 							// length, int* argTypes
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
-							char argTypesChar[messageLength / sizeof(char)];
+							char argTypesChar[messageLength];
 							receiveMessage(i, argTypesChar, messageLength, 0);
 							int* argTypes = (int*) argTypesChar;
+							std::cout << "Received: " << argTypes[0] << std::endl;
 							
 							// length, void** args
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
-							char argsChar[messageLength / sizeof(char)];
+							char argsChar[messageLength];
 							receiveMessage(i, argsChar, messageLength, 0);
 							void** args = (void**) argsChar;
 							
-							std::cout << "Received request for: " << getUniqueFunctionKey(funcName, argTypes) << std::endl;
-
+							std::string key = getUniqueFunctionKey(funcName, argTypes);
+							std::cout << "Received request for: " << key << std::endl;
+							
+							std::map<std::string, skeleton>::iterator it;
+							it = listOfRegisteredFuncArgTypesNew.find(key);
+							if (it != listOfRegisteredFuncArgTypesNew.end()) {
+								std::cout << "Found function pointer for: " << key << std::endl;
+							}
 							// skeleton returns 0, success
 								// reply with EXECUTE_SUCCESS, name, argTypes, args
 							
@@ -669,7 +681,7 @@ int rpcExecute() { /*Jk*/
 								// reply with EXECUTE_FAILURE, reasonCode
 						}
 						
-						free(message);
+						// free(message);
 					}
 				}
 			}
