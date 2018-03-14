@@ -62,6 +62,9 @@ extern "C" {
 #define ARG_INPUT 		31
 #define ARG_OUTPUT 		30
 
+/* The right most two bytes of only array arguments in argTypes will have this value */
+#define ITS_AN_ARRAY	48
+
 #ifdef __cplusplus
 }
 #endif
