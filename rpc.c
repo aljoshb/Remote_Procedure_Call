@@ -244,10 +244,12 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 		// Set the total bytes of the arguments array
 		for (int i=0; i<lengthOfargArray; i++) {
-			int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
-			int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
-			int sizeAtI = getTypeSize(typeAtI);
-
+			uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
+			uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+			uint32_t sizeAtI = getTypeSize(typeAtI);
+			std::cout<<"Length of args at i: "<<lenAtI<<std::endl;
+			std::cout<<"Size of args at i: "<<sizeAtI<<std::endl;
+			std::cout<<"Type of args at i: "<<typeAtI<<std::endl;
 			if (lenAtI==0) { // This argument is not an array
 				totalBytesOfArgs += sizeAtI;
 			}
@@ -285,65 +287,79 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		// Send the args. Each element in args one at a time
 
 		// First send the total expected length of the args array to the server
-		uint32_t lenArgs = (uint32_t)lengthOfargArray;
-		sendInt(fdClientWithServer, &lenArgs, sizeof(lenArgs), 0);
+		// uint32_t lenArgs = (uint32_t)lengthOfargArray;
+		// sendInt(fdClientWithServer, &lenArgs, sizeof(lenArgs), 0);
 
-		// Then send each element of **args individually
+		// // Then send each element of **args individually
+		// for (int i=0; i<lengthOfargArray; i++) {
+		// 	uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
+		// 	uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+		// 	uint32_t sizeAtI = getTypeSize(typeAtI);
+
+		// 	if (lenAtI==0) { // This argument is not an array
+
+		// 		// Send its length
+		// 		messageLength = sizeAtI;
+		// 		sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
+
+		// 		// Send its Type
+		// 		sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
+
+		// 		// Send the actual scalar
+		// 		sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
+				
+		// 	}
+		// 	else {
+
+		// 		// Send its length
+		// 		messageLength = lenAtI*sizeAtI;
+		// 		sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
+
+		// 		// Send its Type
+		// 		sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
+
+		// 		// Send the actual scalar
+		// 		sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
+				
+		// 	}
+		// }
+		//Create message to send to the server received from binder
+		unsigned char* messageArgsToServer = (unsigned char*)malloc(totalBytesOfArgs);
+		int lastCopied=0;
 		for (int i=0; i<lengthOfargArray; i++) {
 			uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
 			uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
 			uint32_t sizeAtI = getTypeSize(typeAtI);
 
 			if (lenAtI==0) { // This argument is not an array
-
-				// Send its length
-				messageLength = sizeAtI;
-				sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
-
-				// Send its Type
-				sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
-
-				// Send the actual scalar
-				sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
-				
+				memcpy(messageArgsToServer+lastCopied, *(args+i), sizeAtI);
+				lastCopied += sizeAtI;
 			}
 			else {
-
-				// Send its length
-				messageLength = lenAtI*sizeAtI;
-				sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
-
-				// Send its Type
-				sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
-
-				// Send the actual scalar
-				sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
-				
+				memcpy(messageArgsToServer+lastCopied, *(args+i), lenAtI*sizeAtI);
+				lastCopied += lenAtI*sizeAtI;
 			}
 		}
-		// Create message to send to the server received from binder
-		// char* messageArgsToServer = (char*)malloc(totalBytesOfArgs+1);
-		// messageArgsToServer[totalBytesOfArgs] ='\0';
-		// int lastCopied=0;
-		// for (int i=0; i<lengthOfargArray; i++) {
-		// 	int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
-		// 	int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
-		// 	int sizeAtI = getTypeSize(typeAtI);
 
-		// 	if (lenAtI==0) { // This argument is not an array
-		// 		memcpy(messageArgsToServer+lastCopied, *(args+i), sizeAtI);
-		// 		lastCopied = sizeAtI;
-		// 	}
-		// 	else {
-		// 		memcpy(messageArgsToServer+lastCopied, *(args+i), lenAtI*sizeAtI);
-		// 		lastCopied = lenAtI*sizeAtI;
-		// 	}
-		// }
+		messageLength = totalBytesOfArgs;
 
-		// messageLength = totalBytesOfArgs+1;
-		// sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
-		// sendMessage(fdClientWithServer, messageArgsToServer, messageLength, 0);
-		// std::cout<<"Message sent to server: "<<messageArgsToServer<<std::endl;
+		// Send args
+		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0); // Send length
+		int ssr= send(fdClientWithServer, messageArgsToServer, messageLength, 0);
+		if (ssr!=messageLength) {
+			int justInCase=ssr;
+			while (justInCase<=messageLength) {
+				ssr= send(fdClientWithServer, messageArgsToServer+ssr, messageLength-ssr, 0);
+				justInCase+=ssr;
+			}
+		}
+		std::cout<<"Message size sent: "<<ssr<<std::endl;
+		std::cout<<"Actual message size: "<<totalBytesOfArgs<<std::endl;
+		std::cout<<"Message sent to server: ";
+		for (int v=0;v<totalBytesOfArgs;v++) {
+			std::cout<<(int)*(messageArgsToServer+v)<<" ";
+		}
+		std::cout<<std::endl;
 
 		/* Receive response back from the Server */
 		uint32_t serverResponseLen;
@@ -362,31 +378,36 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 
 			// Only get the **args back. Redundant to get name and *argTypes back
 
-			// Get the length of args. Ideally should be same as totalBytesOfArgs+1
-			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
-			char* serverPositiveResponse = (char*)malloc(serverResponseLen);
-			receiveMessage(fdClientWithServer, serverPositiveResponse, serverResponseLen, 0);
+			// Get the size of args back. Ideally should be same as totalBytesOfArgs
+			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0); // Get length
 
 			// Put it back into **args
-			int copiedSoFar=0;
+			unsigned char* messageArgsFromServer = (unsigned char*)malloc(totalBytesOfArgs);//malloc(totalBytesOfArgs);
+			int ss= recv(fdClientWithServer, messageArgsFromServer, serverResponseLen, 0);
+			if (ss!=serverResponseLen) {
+				int justInCase=ss;
+				while (justInCase<=serverResponseLen) {
+					ss= recv(fdClientWithServer, messageArgsFromServer+ss, serverResponseLen-ss, 0);
+					justInCase+=ss;
+				}
+			}
+			int lastCopied=0;
 			for (int i=0; i<lengthOfargArray; i++) {
-				int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
-				int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
-				int sizeAtI = getTypeSize(typeAtI);
+				uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
+				uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+				uint32_t sizeAtI = getTypeSize(typeAtI);
 
 				if (lenAtI==0) { // This argument is not an array
-
-					memcpy(*(args+i), serverPositiveResponse+FUNCNAMELENGTH+sizeOfargTypesArray+copiedSoFar, sizeAtI);
-					copiedSoFar += sizeAtI;
+					memcpy(*(args+i), messageArgsFromServer+lastCopied, sizeAtI);
+					lastCopied += sizeAtI;
 				}
 				else {
-
-					memcpy(*(args+i), serverPositiveResponse+FUNCNAMELENGTH+sizeOfargTypesArray+copiedSoFar, lenAtI*sizeAtI);
-					copiedSoFar += lenAtI*sizeAtI;
+					memcpy(*(args+i), messageArgsFromServer+lastCopied, lenAtI*sizeAtI);
+					lastCopied += lenAtI*sizeAtI;
 				}
 			}
 
-			free(serverPositiveResponse);
+			free(messageArgsFromServer);
 
 		}
 		else if (serverResponseType == EXECUTE_FAILURE) {
@@ -403,12 +424,9 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			}
 		}
 
-
+		free(messageArgsToServer);
 		free(serverIdentifier);
 		free(serverPortNum);
-		// free(messageArgsToServer);
-		
-
 	}
 	else if (binderResponseType == LOC_FAILURE) {
 
@@ -450,21 +468,21 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	int* argTypesToSend = (int*)malloc(sizeOfargTypesArray);
 	int totalBytesOfArgs = 0;
 
-		for (int i=0; i<lengthOfargTypesArray; i++) {
-			int inputOutInfo = *(argTypes+i) >> 24 & 0xff; // The 1st byte from the left
-			int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
-			int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
+	for (int i=0; i<lengthOfargTypesArray; i++) {
+		int inputOutInfo = *(argTypes+i) >> 24 & 0xff; // The 1st byte from the left
+		int typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
+		int lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
 
-			if (lenAtI==0) { // This argument is not an array
+		if (lenAtI==0) { // This argument is not an array
 
-				// No need to update argTypes at this location, its the same
-				*(argTypesToSend+i) = *(argTypes+i);
-			}
-			else {
+			// No need to update argTypes at this location, its the same
+			*(argTypesToSend+i) = *(argTypes+i);
+		}
+		else {
 
-				// Update argTypes at this location
-				*(argTypesToSend+i) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
-			}
+			// Update argTypes at this location
+			*(argTypesToSend+i) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
+		}
 	}
 
 	/* Check if this has been previously registered */
@@ -523,7 +541,6 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 		}
 	}
 	std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
-
 
 	std::cout<<"Registration message sent to the binder"<<std::endl;
 	/* Get the response back from the binder */ 
