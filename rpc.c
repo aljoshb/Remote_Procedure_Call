@@ -669,107 +669,97 @@ int rpcExecute() { /*Jk*/
 
 				else { // Received data from an existing connection
 					// First, get the length of the incoming message
-					receiveInt(i, &messageLength, sizeof(messageLength), 0);
-					std::cout << "Received length: " << messageLength << std::endl;
+					int result = receiveInt(i, &messageLength, sizeof(messageLength), 0);
 
-					// Next, get the type of the incoming message
-					receiveInt(i, &messageType, sizeof(messageType), 0);
-					std::cout << "Received type: " << messageType << std::endl;
+					if (result < 0) {
+						close(i);
+						FD_CLR(i, &master_fd);
+						break;
+					}
+
+					else {
+						// Next, get the type of the incoming message
+						messageType = 0;
+						receiveInt(i, &messageType, sizeof(messageType), 0);
+						std::cout << "Received type: " << messageType << std::endl;
+						std::cout << "Received length: " << messageLength << std::endl;
+					}
 
 					// forward request to skeleton
 					if (messageType == EXECUTE) {
-						// Allocate the appropriate memory and get the message
-						// char *message;
-						// message = (char*) malloc(messageLength);
-
-						// nbytes = recv(i, message, messageLength, 0);
-						// if (nbytes>=1 && nbytes<messageLength) { // If full message not received
-						// 	int justInCase=nbytes;
-						// 	while (justInCase<=messageLength) {
-						// 		nbytes = recv(i, message+nbytes, messageLength, 0);
-						// 		justInCase+=nbytes;
-						// 	}
-						// }
-
-						// If error or no data, close socket with this client or server
-						// if (nbytes <= 0) {
-						// 	close(i);
-						// 	FD_CLR(i, &master_fd);
-						// }
-
-						if (0) {}
-
-						// message is not empty, safe to read
-						else {
-							// message format from rpcCall
-							// length, char* funcName
-							receiveInt(i, &messageLength, sizeof(messageLength), 0);
-							char funcName[messageLength];
-							receiveMessage(i, funcName, messageLength, 0);
-							std::cout << "Received: " << funcName << std::endl;
-							
-							// length, int* argTypes
-							receiveInt(i, &messageLength, sizeof(messageLength), 0);
-							char argTypesChar[messageLength];
-							receiveMessage(i, argTypesChar, messageLength, 0);
-							int* argTypes = (int*) argTypesChar;
-							std::cout << "Received: " << argTypes[0] << std::endl;
-							
-							// convert to intermediate form to handle arbitrary length arrays
-							int argTypesToSend[messageLength/sizeof(int)];
-
-							int lengthOfargTypesArray = 0;
-							int k = 0;
-
-							while (true) {
-								std::cout << *(argTypes+k) << " ";
-								if (*(argTypes+k) == 0) {
-									lengthOfargTypesArray = k+1;
-									break;
-								}
-								k++;
-							}
-							std::cout << std::endl;
-
-							for (int j = 0; j < lengthOfargTypesArray; j++) {
-								int inputOutInfo = *(argTypes+j) >> 24 & 0xff; // The 1st byte from the left
-								int typeAtI = *(argTypes+j) >> 16 & 0xff; // To get the 2nd byte from the left
-								int lenAtI = *(argTypes+j) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
-
-								if (lenAtI==0) { // This argument is not an array
-
-									// No need to update argTypes at this location, its the same
-									*(argTypesToSend+j) = *(argTypes+j);
-								}
-								else {
-
-									// Update argTypes at this location
-									*(argTypesToSend+j) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
-								}
-							}
-
-							// length, void** args
-							receiveInt(i, &messageLength, sizeof(messageLength), 0);
-							char argsChar[messageLength];
-							receiveMessage(i, argsChar, messageLength, 0);
-							void** args = (void**) argsChar;
-							
-							std::string key = getUniqueFunctionKey(funcName, argTypesToSend);
-							std::cout << "Received request for: " << key << std::endl;
-							
-							std::map<std::string, skeleton>::iterator it;
-							it = listOfRegisteredFuncArgTypesNew.find(key);
-							if (it != listOfRegisteredFuncArgTypesNew.end()) {
-								std::cout << "Found function pointer for: " << key << std::endl;
-							}
-							// skeleton returns 0, success
-								// reply with EXECUTE_SUCCESS, name, argTypes, args
-							
-							// skeleton returns non-zero, failure
-								// reply with EXECUTE_FAILURE, reasonCode
-						}
+						// message format from rpcCall
+						// length, char* funcName
+						receiveInt(i, &messageLength, sizeof(messageLength), 0);
+						char funcName[messageLength];
+						receiveMessage(i, funcName, messageLength, 0);
+						std::cout << "Received: " << funcName << std::endl;
 						
-						// free(message);
+						// length, int* argTypes
+						receiveInt(i, &messageLength, sizeof(messageLength), 0);
+						char argTypesChar[messageLength];
+						receiveMessage(i, argTypesChar, messageLength, 0);
+						int* argTypes = (int*) argTypesChar;
+						std::cout << "Received: " << argTypes[0] << std::endl;
+						
+						// convert to intermediate form to handle arbitrary length arrays
+						int argTypesToSend[messageLength/sizeof(int)];
+
+						int lengthOfargTypesArray = 0;
+						int k = 0;
+
+						while (true) {
+							std::cout << *(argTypes+k) << " ";
+							if (*(argTypes+k) == 0) {
+								lengthOfargTypesArray = k+1;
+								break;
+							}
+							k++;
+						}
+						std::cout << std::endl;
+
+						for (int j = 0; j < lengthOfargTypesArray; j++) {
+							int inputOutInfo = *(argTypes+j) >> 24 & 0xff; // The 1st byte from the left
+							int typeAtI = *(argTypes+j) >> 16 & 0xff; // To get the 2nd byte from the left
+							int lenAtI = *(argTypes+j) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
+
+							if (lenAtI==0) { // This argument is not an array
+
+								// No need to update argTypes at this location, its the same
+								*(argTypesToSend+j) = *(argTypes+j);
+							}
+							else {
+								// Update argTypes at this location
+								*(argTypesToSend+j) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
+							}
+						}
+
+						// length, void** args
+						receiveInt(i, &messageLength, sizeof(messageLength), 0);
+						char argsChar[messageLength];
+						receiveMessage(i, argsChar, messageLength, 0);
+						void** args = (void**) argsChar;
+						
+						std::string key = getUniqueFunctionKey(funcName, argTypesToSend);
+						std::cout << "Received request for: " << key << std::endl;
+						
+						// check that function exists on the server
+						std::map<std::string, skeleton>::iterator it;
+						it = listOfRegisteredFuncArgTypesNew.find(key);
+						if (it != listOfRegisteredFuncArgTypesNew.end()) {
+							std::cout << "Found function pointer for: " << key << std::endl;
+
+							skeleton skel = listOfRegisteredFuncArgTypesNew[key];
+							// (*skel) (argTypes, args);
+						}
+
+						else {
+
+						}
+						// skeleton returns 0, success
+							// reply with EXECUTE_SUCCESS, name, argTypes, args
+						
+						// skeleton returns non-zero, failure
+							// reply with EXECUTE_FAILURE, reasonCode
 					}
 				}
 			}
