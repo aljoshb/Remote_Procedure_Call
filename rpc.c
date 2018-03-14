@@ -715,13 +715,46 @@ int rpcExecute() { /*Jk*/
 							int* argTypes = (int*) argTypesChar;
 							std::cout << "Received: " << argTypes[0] << std::endl;
 							
+							// convert to intermediate form to handle arbitrary length arrays
+							int argTypesToSend[messageLength/sizeof(int)];
+
+							int lengthOfargTypesArray = 0;
+							int k = 0;
+
+							while (true) {
+								std::cout << *(argTypes+k) << " ";
+								if (*(argTypes+k) == 0) {
+									lengthOfargTypesArray = k+1;
+									break;
+								}
+								k++;
+							}
+							std::cout << std::endl;
+
+							for (int j = 0; j < lengthOfargTypesArray; j++) {
+								int inputOutInfo = *(argTypes+j) >> 24 & 0xff; // The 1st byte from the left
+								int typeAtI = *(argTypes+j) >> 16 & 0xff; // To get the 2nd byte from the left
+								int lenAtI = *(argTypes+j) & 0xffff; // Get only the rightmost 16 bits (3rd and 4th from left)
+
+								if (lenAtI==0) { // This argument is not an array
+
+									// No need to update argTypes at this location, its the same
+									*(argTypesToSend+j) = *(argTypes+j);
+								}
+								else {
+
+									// Update argTypes at this location
+									*(argTypesToSend+j) = (inputOutInfo << 24) | (typeAtI << 16) | ITS_AN_ARRAY;
+								}
+							}
+
 							// length, void** args
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char argsChar[messageLength];
 							receiveMessage(i, argsChar, messageLength, 0);
 							void** args = (void**) argsChar;
 							
-							std::string key = getUniqueFunctionKey(funcName, argTypes);
+							std::string key = getUniqueFunctionKey(funcName, argTypesToSend);
 							std::cout << "Received request for: " << key << std::endl;
 							
 							std::map<std::string, skeleton>::iterator it;
