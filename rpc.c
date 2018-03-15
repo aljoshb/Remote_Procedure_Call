@@ -738,16 +738,40 @@ int rpcExecute() { /*Jk*/
 						receiveInt(i, &messageLength, sizeof(messageLength), 0);
 						char argsChar[messageLength];
 						receiveMessage(i, argsChar, messageLength, 0);
-						void** args = (void**) argsChar;
+						// std::cout << funcName << " args: " << std::endl;
+						// for (int j = 0; j < messageLength; j++) {
+						// 	int curr = (unsigned char) argsChar[j];
 
-						std::cout << funcName << " args: " << std::endl;
-						for (int j = 0; j < messageLength; j++) {
-							int curr = (unsigned char) argsChar[j];
+						// 	std::cout << curr;
+						// 	std::cout << " ";
+						// }
+						// std::cout << std::endl;
 
-							std::cout << curr;
-							std::cout << " ";
+						// make void* array
+						// each pointer needs to point at the start of memory of each argument
+						void* args[lengthOfargTypesArray];
+						int offset = 0;
+						
+						// the first element shares the same address as the beginning of the char array
+						args[0] = &argsChar;
+						
+						// lengthOfargTypesArray - 1 since the last element is 0
+						for (int j = 0; j < lengthOfargTypesArray - 1; j++) {
+							args[j] = ((char *) &argsChar) + offset;
+
+							std::cout << "void* args[" << j << "]: " << args[j] << std::endl;
+
+							uint32_t lenAtJ = *(argTypes + j) & 0xffff; // Get only the rightmost 16 bits
+							uint32_t typeAtJ = *(argTypes + j) >> 16 & 0xff; // To get the 2nd byte from the left
+							uint32_t sizeAtJ = getTypeSize(typeAtJ);
+
+							if (lenAtJ == 0) { // This argument is not an array
+								offset += sizeAtJ;
+							}
+							else {
+								offset += lenAtJ * sizeAtJ;
+							}
 						}
-						std::cout << std::endl;
 						
 						std::string key = getUniqueFunctionKey(funcName, argTypesToSend);
 						std::cout << "Received request for: " << key << std::endl;
@@ -759,17 +783,22 @@ int rpcExecute() { /*Jk*/
 							skeleton skel = listOfRegisteredFuncArgTypesNew.at(key);
 							std::cout << "Found function pointer for: " << key << " : " << (void *) skel << std::endl;
 							
-							// int result = (*skel) (argTypes, args);
+							int result = (*skel) (argTypes, args);
+							
+							// skeleton returns 0, success
+							if (result == 0) {
+								// reply with EXECUTE_SUCCESS, name, argTypes, args
+							}
+
+							// skeleton returns non-zero, failure
+							else {
+								// reply with EXECUTE_FAILURE, reasonCode
+							}
 						}
 
 						else {
 
 						}
-						// skeleton returns 0, success
-							// reply with EXECUTE_SUCCESS, name, argTypes, args
-						
-						// skeleton returns non-zero, failure
-							// reply with EXECUTE_FAILURE, reasonCode
 					}
 				}
 			}
