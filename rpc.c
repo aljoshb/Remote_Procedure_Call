@@ -797,16 +797,6 @@ int rpcExecute() { /*Jk*/
 							// skeleton returns non-zero, failure
 							result = (*skel) (argTypes, args) == 0 ? EXECUTE_SUCCESS : EXECUTE_FAILURE;
 							
-							// _______ ____    _____   ____  
-							//|__   __/ __ \  |  __ \ / __ \ 
-							//   | | | |  | | | |  | | |  | |
-							// 	 | | | |  | | | |  | | |  | |
-							// 	 | | | |__| | | |__| | |__| |
-							// 	 |_|  \____/  |_____/ \____/ 
-							// 
-							// f2 doesn't work properly
-							//								
-
 							// copy the server's local memory to be sent to the client
 							offset = 0;
 							// lengthOfargTypesArray - 1 since the last element is 0
