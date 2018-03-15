@@ -443,6 +443,19 @@ int main() {
 								sendInt(i, &responseLength, sizeof(responseLength), 0);
 								sendMessage(i, serverPortchar, responseLength, 0);
 
+								// Reset all the other queues to ensure the server just sent is also not at the front
+								// std::map<std::string, std::queue<std::string> > binderDatabaseStr2;
+								std::string frontOfQueue;
+								for (std::map<std::string, std::queue<std::string> >::iterator it=binderDatabaseStr2.begin(); it!=binderDatabaseStr2.end(); ++it) {
+    								// std::cout << it->first << " => " << it->second << '\n';
+    								frontOfQueue = binderDatabaseStr2[it->first].front(); 
+    								if ( frontOfQueue.compare(serverIdAndPort) == 0) {
+    									binderDatabaseStr2[it->first].pop();
+										binderDatabaseStr2[it->first].push(serverIdAndPort);
+										// std::cout<<"out"<<std::endl;
+    								}
+								}
+
 							}
 							else { // It does not exist
 								// Respond with LOC_FAILURE and reasonCode
