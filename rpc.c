@@ -126,6 +126,7 @@ int rpcInit() { /*Josh*/
 }
 
 int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
+	int hasFailed = 0;
 
 	/* Create a connection to the binder */
 	if (fdClientWithBinder == -1) { // A connection hasn't been created yet. Avoid creating multiple connections to the same binder.
@@ -368,16 +369,11 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		uint32_t serverNegativeResponse;
 
 		// Get the type
-		// receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0); /-------Uncomment this when rpcExecute is done
-		// receiveInt(fdClientWithServer, &serverResponseType, serverResponseLen, 0); /-------Uncomment this when rpcExecute is done
-
-		serverResponseType = EXECUTE_FAILURE; //-------Remove this when rpcExecute is done!!!!!!!!!!!
+		receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
+		receiveInt(fdClientWithServer, &serverResponseType, serverResponseLen, 0);
 
 		// Get the message
 		if (serverResponseType == EXECUTE_SUCCESS) {
-
-			// Only get the **args back. Redundant to get name and *argTypes back
-
 			// Get the size of args back. Ideally should be same as totalBytesOfArgs
 			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0); // Get length
 
@@ -391,37 +387,39 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 					justInCase+=ss;
 				}
 			}
-			int lastCopied=0;
+			int offset = 0;
 			for (int i=0; i<lengthOfargArray; i++) {
 				uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
 				uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
 				uint32_t sizeAtI = getTypeSize(typeAtI);
 
 				if (lenAtI==0) { // This argument is not an array
-					memcpy(*(args+i), messageArgsFromServer+lastCopied, sizeAtI);
-					lastCopied += sizeAtI;
+					memcpy(*(args+i), messageArgsFromServer + offset, sizeAtI);
+					offset += sizeAtI;
 				}
 				else {
-					memcpy(*(args+i), messageArgsFromServer+lastCopied, lenAtI*sizeAtI);
-					lastCopied += lenAtI*sizeAtI;
+					memcpy(*(args+i), messageArgsFromServer + offset, lenAtI*sizeAtI);
+					offset += lenAtI*sizeAtI;
 				}
 			}
 
 			free(messageArgsFromServer);
-
 		}
+
 		else if (serverResponseType == EXECUTE_FAILURE) {
-
-			// receiveInt(fdClientWithServer, &serverNegativeResponse, sizeof(serverNegativeResponse), 0); /-------Uncomment this when rpcExecute is done
-
-			serverNegativeResponse = SERVER_CANNOT_HANDLE_REQUEST; //-------Remove this when rpcExecute is done!!!!!!!!!!!
-
+			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
+			receiveInt(fdClientWithServer, &serverNegativeResponse, sizeof(serverNegativeResponse), 0);
 			if (serverNegativeResponse == SERVER_CANNOT_HANDLE_REQUEST) {
-				printf("server does not have this procedure\n");
+				printf("Error during server function execution.\n");
+			}
+			else if (serverNegativeResponse == SERVER_DOES_NOT_HAVE_RPC) {
+				printf("Server does not have remote procedure.\n");
 			}
 			else if (serverNegativeResponse == SERVER_IS_OVERLOADED) {
 				printf("server is currently overloaded, try again later...\n");
 			}
+
+			hasFailed = 1;
 		}
 
 		free(messageArgsToServer);
@@ -442,7 +440,7 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		printf("Received nothing!\n");
 	}
 	
-	return 0;
+	return hasFailed;
 }
 
 int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
@@ -737,16 +735,25 @@ int rpcExecute() { /*Jk*/
 
 						// length, void** args
 						receiveInt(i, &messageLength, sizeof(messageLength), 0);
-						char argsChar[messageLength];
-						receiveMessage(i, argsChar, messageLength, 0);
-						// std::cout << funcName << " args: " << std::endl;
-						// for (int j = 0; j < messageLength; j++) {
-						// 	int curr = (unsigned char) argsChar[j];
+						uint32_t argsLength = messageLength;
+						char argsChar[argsLength];
 
-						// 	std::cout << curr;
-						// 	std::cout << " ";
-						// }
-						// std::cout << std::endl;
+						receiveMessage(i, argsChar, argsLength, 0);
+
+						// print out args before function call
+						std::cout << funcName << " args before function call: " << std::endl;
+						for (int j = 0; j < argsLength; j++) {
+							int curr = (unsigned char) argsChar[j];
+
+							// print newline every 8 bytes
+							if (j % 8 == 0) std::cout << std::endl;
+
+							// pad 0 if only 1 hex character
+							if (curr < 0x10) std::cout << "0";
+							std::cout << std::hex << curr;
+							std::cout << " ";
+						}
+						std::cout << std::endl;
 
 						// make void* array
 						// each pointer needs to point at the start of memory of each argument
@@ -778,27 +785,76 @@ int rpcExecute() { /*Jk*/
 						std::cout << "Received request for: " << key << std::endl;
 						
 						// check that function exists on the server
+						uint32_t result = EXECUTE_FAILURE;
+
 						std::map<std::string, skeleton>::iterator it;
 						it = listOfRegisteredFuncArgTypesNew.find(key);
 						if (it != listOfRegisteredFuncArgTypesNew.end()) {
 							skeleton skel = listOfRegisteredFuncArgTypesNew.at(key);
 							std::cout << "Found function pointer for: " << key << " : " << (void *) skel << std::endl;
 							
-							int result = (*skel) (argTypes, args);
-							
 							// skeleton returns 0, success
-							if (result == 0) {
-								// reply with EXECUTE_SUCCESS, name, argTypes, args
+							// skeleton returns non-zero, failure
+							result = (*skel) (argTypes, args) == 0 ? EXECUTE_SUCCESS : EXECUTE_FAILURE;
+							
+							// _______ ____    _____   ____  
+							//|__   __/ __ \  |  __ \ / __ \ 
+							//   | | | |  | | | |  | | |  | |
+							// 	 | | | |  | | | |  | | |  | |
+							// 	 | | | |__| | | |__| | |__| |
+							// 	 |_|  \____/  |_____/ \____/ 
+							// 
+							// f2 doesn't work properly
+							//								
+
+							// print out args after function call
+							std::cout << funcName << " after function call: " << std::endl;
+							for (int j = 0; j < argsLength; j++) {
+								int curr = (unsigned char) argsChar[j];
+
+								// print newline every 8 bytes
+								if (j % 8 == 0) std::cout << std::endl;
+
+								// pad 0 if only 1 hex character
+								if (curr < 0x10) std::cout << "0";
+								std::cout << std::hex << curr;
+								std::cout << " ";
+								
+							}
+							std::cout << std::endl;
+
+							// reply EXECUTE_SUCCESS or EXECUTE_FAILURE depending on result
+							messageLength = sizeof(result);
+							sendInt(i, &messageLength, sizeof(messageLength), 0);
+							sendInt(i, &result, sizeof(result), 0);
+
+							if (result == EXECUTE_SUCCESS) {
+								// send args
+								sendInt(i, &argsLength, sizeof(argsLength), 0);
+								sendMessage(i, argsChar, argsLength, 0);
 							}
 
-							// skeleton returns non-zero, failure
 							else {
-								// reply with EXECUTE_FAILURE, reasonCode
+								// send reasonCode
+								uint32_t reasonCode = SERVER_CANNOT_HANDLE_REQUEST;
+								messageLength = sizeof(reasonCode);
+
+								sendInt(i, &messageLength, sizeof(messageLength), 0);
+								sendInt(i, &reasonCode, sizeof(reasonCode), 0);
 							}
 						}
 
 						else {
+							messageLength = sizeof(result);
+							sendInt(i, &messageLength, sizeof(messageLength), 0);
+							sendInt(i, &result, sizeof(result), 0);
 
+							// send reasonCode
+							uint32_t reasonCode = SERVER_DOES_NOT_HAVE_RPC;
+							messageLength = sizeof(reasonCode);
+
+							sendInt(i, &messageLength, sizeof(messageLength), 0);
+							sendInt(i, &reasonCode, sizeof(reasonCode), 0);
 						}
 					}
 				}

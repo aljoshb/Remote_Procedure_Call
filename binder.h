@@ -39,6 +39,7 @@ extern "C" {
 #define NO_SERVER_CAN_HANDLE_REQUEST 	-4
 #define SERVER_CANNOT_HANDLE_REQUEST 	-5
 #define SERVER_IS_OVERLOADED		 	-6
+#define SERVER_DOES_NOT_HAVE_RPC		-7
 
 /* Warnings/Follow-up Messages from Binder */
 #define NEW_REGISTRATION   				11
