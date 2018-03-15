@@ -807,6 +807,25 @@ int rpcExecute() { /*Jk*/
 							// f2 doesn't work properly
 							//								
 
+							// copy the server's local memory to be sent to the client
+							offset = 0;
+							// lengthOfargTypesArray - 1 since the last element is 0
+							for (int j = 0; j < lengthOfargTypesArray - 1; j++) {
+								uint32_t lenAtJ = *(argTypes + j) & 0xffff; // Get only the rightmost 16 bits
+								uint32_t typeAtJ = *(argTypes + j) >> 16 & 0xff; // To get the 2nd byte from the left
+								uint32_t sizeAtJ = getTypeSize(typeAtJ);
+
+								if (lenAtJ == 0) { // This argument is not an array
+									memcpy(argsChar + offset, *(args + j), sizeAtJ);
+
+									offset += sizeAtJ;
+								}
+								else {
+									memcpy(argsChar + offset, *(args + j), lenAtJ*sizeAtJ);
+									offset += lenAtJ * sizeAtJ;
+								}
+							}
+
 							// print out args after function call
 							std::cout << funcName << " after function call: " << std::endl;
 							for (int j = 0; j < argsLength; j++) {
