@@ -80,11 +80,13 @@ int rpcInit() { /*Josh*/
 		break;
 	}
 	if (fdServerWithClient<0) { // If we come out of the loop and still not bound to a socket
-		fprintf(stderr, "librpc: no valid socket was found\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "librpc: no valid socket was found\n");
 		return -1;
 	}
 	if (goodres == NULL) {
-		fprintf(stderr, "librpc: failed to bind\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "librpc: failed to bind\n");
 		return -1;
 	}
 	if (DEBUG_PRINT_ENABLED)
@@ -126,7 +128,8 @@ int rpcInit() { /*Josh*/
 		std::cout<<"Binder file descriptor created: "<<fdServerWithBinder<<std::endl;
 	
 	if (fdServerWithBinder<0) { // If we come out of the loop and still not found
-		fprintf(stderr, "librpc: no valid socket was found\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "librpc: no valid socket was found\n");
 		return -1;
 	}
 
@@ -143,7 +146,8 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		fdClientWithBinder = connection(binderIP, binderPort);
 	}
 	if (fdClientWithBinder<0) {
-		fprintf(stderr, "librpc: unable to connect with the binder\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "librpc: unable to connect with the binder\n");
 		return -1;
 	}
 	// Set the message length
@@ -246,7 +250,8 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		/* Now contact the server gotten from the binder */
 		int fdClientWithServer = connection(serverIdentifier, serverPortNum);
 		if (fdClientWithServer<0) {
-			fprintf(stderr, "librpc: unable to connect with the binder\n");
+			if (ERROR_PRINT_ENABLED)
+				fprintf(stderr, "librpc: unable to connect with the binder\n");
 			return -1;
 		}
 
@@ -434,13 +439,16 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
 			receiveInt(fdClientWithServer, &serverNegativeResponse, sizeof(serverNegativeResponse), 0);
 			if (serverNegativeResponse == SERVER_CANNOT_HANDLE_REQUEST) {
-				printf("librpc: Error during server function execution.\n");
+				if (ERROR_PRINT_ENABLED)
+					printf("librpc: Error during server function execution.\n");
 			}
 			else if (serverNegativeResponse == SERVER_DOES_NOT_HAVE_RPC) {
-				printf("librpc: Server does not have remote procedure.\n");
+				if (ERROR_PRINT_ENABLED)
+					printf("librpc: Server does not have remote procedure.\n");
 			}
 			else if (serverNegativeResponse == SERVER_IS_OVERLOADED) {
-				printf("librpc: Server is currently overloaded, try again later...\n");
+				if (ERROR_PRINT_ENABLED)
+					printf("librpc: Server is currently overloaded, try again later...\n");
 			}
 
 			hasFailed = 1;
@@ -455,13 +463,15 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		receiveInt(fdClientWithBinder, &binderNegativeResponse, binderResponseLen, 0);
 
 		if (binderNegativeResponse == NO_SERVER_CAN_HANDLE_REQUEST) {
-			printf("librpc: No server can handle the request\n");
+			if (ERROR_PRINT_ENABLED)
+				printf("librpc: No server can handle the request\n");
 		}
 
 	}
 
 	else {
-		printf("librpc: Received nothing!\n");
+		if (ERROR_PRINT_ENABLED)
+			printf("librpc: Received nothing!\n");
 	}
 	
 	return hasFailed;
@@ -512,7 +522,8 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	std::map<std::string, skeleton>::iterator it;
 	it = listOfRegisteredFuncArgTypesNew.find(nameArgTypesCombo);
 	if (it != listOfRegisteredFuncArgTypesNew.end()) { // It is has been registered
-		printf("librpc: binder previously registered this function and argTypes\n");
+		if (ERROR_PRINT_ENABLED)
+			printf("librpc: binder previously registered this function and argTypes\n");
 		return PREVIOUSLY_REGISTERED;
 	}
 	// for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
@@ -604,7 +615,8 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 			printf("REGISTER_FAILURE\n");
 
 		if (responseMessage == BINDER_UNABLE_TO_REGISTER) {
-			perror("librpc: unable to registe with binder\n");
+			if (ERROR_PRINT_ENABLED)
+				perror("librpc: unable to registe with binder\n");
 		}
 		return BINDER_UNABLE_TO_REGISTER;
 	}
@@ -618,7 +630,8 @@ int rpcExecute() { /*Jk*/
 
 	// listen on the initialized sockets
 	if (listen(fdServerWithClient, BACKLOG) == -1) {
-		fprintf(stderr, "librpc: error while trying to listen in rpcExecute()\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "librpc: error while trying to listen in rpcExecute()\n");
 	}
 	
 	// set up for select
@@ -941,7 +954,8 @@ int rpcTerminate() { /*Jk*/
 		fdClientWithBinder = connection(binderIP, binderPort);
 	}
 	if (fdClientWithBinder < 0) {
-		fprintf(stderr, "librpc: Unable to connect to binder in rpcTerminate()\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "librpc: Unable to connect to binder in rpcTerminate()\n");
 		return -1;
 	}
 

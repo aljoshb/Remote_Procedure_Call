@@ -63,14 +63,16 @@ int main() {
 		// Create the socket
 		binderSocket = socket(goodres->ai_family, goodres->ai_socktype, goodres->ai_protocol);
 		if (binderSocket<0) {
-			perror("binder: error on creating a binder socket");
+			if (ERROR_PRINT_ENABLED)
+				perror("binder: error on creating a binder socket");
 			continue;
 		}
 
 		// Bind the socket
 		if (bind(binderSocket, goodres->ai_addr, goodres->ai_addrlen) == -1) {
 			close(binderSocket);
-			perror("binder: error on binding the binder");
+			if (ERROR_PRINT_ENABLED)
+				perror("binder: error on binding the binder");
 			continue;
 		}
 		break;
@@ -89,7 +91,8 @@ int main() {
 
 	/* Listen for connections */
 	if (listen(binderSocket, BACKLOG) == -1) {
-		fprintf(stderr, "binder: error while trying to listen\n");
+		if (ERROR_PRINT_ENABLED)
+			fprintf(stderr, "binder: error while trying to listen\n");
 	}
 
 	/* Get the Binder's port number and IP */

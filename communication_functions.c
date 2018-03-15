@@ -343,14 +343,15 @@ int connection(const char *destIP, const char *destPort) {
 		socketfd = socket(goodres2->ai_family, goodres2->ai_socktype, goodres2->ai_protocol);
 		if (socketfd<0) { // i.e. not -1
 			// Not found yet!
-			perror("error on creating socket\n");
+			if (ERROR_PRINT_ENABLED)
+				perror("error on creating socket\n");
 			continue;
 		}
 
 		// Connect
 		if (connect(socketfd, goodres2->ai_addr, goodres2->ai_addrlen) == -1) {
 			close(socketfd);
-			if (DEBUG_PRINT_ENABLED)
+			if (ERROR_PRINT_ENABLED)
 				perror("error on creating a new connection\n");
 				
 			continue;
