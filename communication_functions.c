@@ -48,6 +48,7 @@ uint32_t getTypeSize(uint32_t typeGotten) {
 			break;
 	  
 		default:
+		if (DEBUG_PRINT_ENABLED)
 			printf("Invalid Type\n");
 	}
 
@@ -255,7 +256,9 @@ int receiveInt(int socketfd, uint32_t *numToReceive, size_t length, int flags) {
 
 	/* Encountered an error while trying to receive */
 	if (nbytes<=0) {
-		printf("Error while trying to receive. Closing socket....\n");
+		if (DEBUG_PRINT_ENABLED)
+			printf("Error while trying to receive. Closing socket....\n");
+
 		close(socketfd);
 		return -1;
 	}
@@ -297,7 +300,9 @@ int receiveMessage(int socketfd, char *messageToReceive, size_t length, int flag
 
 	/* Encountered an error while trying to receive */
 	if (nbytes<=0) {
-		printf("Error while trying to receive. Closing socket....\n");
+		if (DEBUG_PRINT_ENABLED)
+			printf("Error while trying to receive. Closing socket....\n");
+
 		// close(socketfd);
 	}
 	/* If full message was not received in first receive attempt */
@@ -345,13 +350,17 @@ int connection(const char *destIP, const char *destPort) {
 		// Connect
 		if (connect(socketfd, goodres2->ai_addr, goodres2->ai_addrlen) == -1) {
 			close(socketfd);
-			perror("error on creating a new connection\n");
+			if (DEBUG_PRINT_ENABLED)
+				perror("error on creating a new connection\n");
+				
 			continue;
 		}
 		break;
 	}
 	if (socketfd<0) { // If we come out of the loop and still not found
-		fprintf(stderr, "no valid socket was found\n");
+		if (DEBUG_PRINT_ENABLED)
+			fprintf(stderr, "no valid socket was found\n");
+
 		return -1;
 	}
 

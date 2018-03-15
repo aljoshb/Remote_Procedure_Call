@@ -80,14 +80,16 @@ int rpcInit() { /*Josh*/
 		break;
 	}
 	if (fdServerWithClient<0) { // If we come out of the loop and still not bound to a socket
-		fprintf(stderr, "no valid socket was found\n");
+		fprintf(stderr, "librpc: no valid socket was found\n");
 		return -1;
 	}
 	if (goodres == NULL) {
-		fprintf(stderr, "failed to bind\n");
+		fprintf(stderr, "librpc: failed to bind\n");
 		return -1;
 	}
-	std::cout<<"Server Listening...." <<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Server Listening...." <<std::endl;
+
 	/* Free res */
 	freeaddrinfo(res);
 
@@ -103,10 +105,14 @@ int rpcInit() { /*Josh*/
 			perror("error on gethostname");
 		}
 		//serverPort = ntohs(serverAddress.sin_port);
+		
 		memset(serverPort, 0, SERVERPORT);
 		sprintf(serverPort, "%d", ntohs(serverAddress.sin_port));
-		printf("SERVER_ADDRESS %s\n",getServerHostName);
-		printf("SERVER_PORT %s\n", serverPort);
+
+		if (DEBUG_PRINT_ENABLED) {
+			printf("SERVER_ADDRESS %s\n",getServerHostName);
+			printf("SERVER_PORT %s\n", serverPort);
+		}
 	}
 
 	/* Second Init Step: Server socket connection for communication with binder*/
@@ -116,9 +122,11 @@ int rpcInit() { /*Josh*/
 	const char *binderPort = getenv("BINDER_PORT");
 
 	fdServerWithBinder = connection(binderIP, binderPort);
-	std::cout<<"Binder file descriptor created: "<<fdServerWithBinder<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Binder file descriptor created: "<<fdServerWithBinder<<std::endl;
+	
 	if (fdServerWithBinder<0) { // If we come out of the loop and still not found
-		fprintf(stderr, "no valid socket was found\n");
+		fprintf(stderr, "librpc: no valid socket was found\n");
 		return -1;
 	}
 
@@ -135,7 +143,7 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		fdClientWithBinder = connection(binderIP, binderPort);
 	}
 	if (fdClientWithBinder<0) {
-		fprintf(stderr, "unable to connect with the binder\n");
+		fprintf(stderr, "librpc: unable to connect with the binder\n");
 		return -1;
 	}
 	// Set the message length
@@ -180,13 +188,15 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 	messageLength = sizeof(messageType);
 	sendInt(fdClientWithBinder, &messageLength, sizeof(messageLength), 0);
 	sendInt(fdClientWithBinder, &messageType, messageLength, 0);
-	std::cout<<"Message sent: "<<messageType<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<messageType<<std::endl;
 
 	// Send the funcName
 	messageLength = strlen(name)+1;
 	sendInt(fdClientWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
 	sendMessage(fdClientWithBinder, name, messageLength, 0);
-	std::cout<<"Message sent: "<<name<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<name<<std::endl;
 
 	// Send the argTypes
 	messageLength = sizeOfargTypesArray;
@@ -201,7 +211,8 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			justInCase+=sendLength;
 		}
 	}
-	std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
 
 	/* Receive response back from the binder */
 	uint32_t binderResponseLen;
@@ -214,26 +225,28 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 	
 	
 	if (binderResponseType == LOC_SUCCESS) {
-
-		std::cout<<"LOC_SUCCESS!"<<std::endl;
+		if (DEBUG_PRINT_ENABLED)
+			std::cout<<"LOC_SUCCESS!"<<std::endl;
 
 		// Get the server identifier
 		receiveInt(fdClientWithBinder, &binderResponseLen, sizeof(binderResponseLen), 0);
 		char* serverIdentifier = (char*)malloc(binderResponseLen);
 		receiveMessage(fdClientWithBinder, serverIdentifier, binderResponseLen, 0);
-		std::cout<<"Server IP Received: "<<serverIdentifier<<std::endl;
+		if (DEBUG_PRINT_ENABLED)
+			std::cout<<"Server IP Received: "<<serverIdentifier<<std::endl;
 
 		// Get the server port
 		receiveInt(fdClientWithBinder, &binderResponseLen, sizeof(binderResponseLen), 0);
 		char* serverPortNum = (char*)malloc(binderResponseLen);
 		receiveMessage(fdClientWithBinder, serverPortNum, binderResponseLen, 0);
-		std::cout<<"Server Port Received: "<<serverPortNum<<std::endl;
+		if (DEBUG_PRINT_ENABLED)
+			std::cout<<"Server Port Received: "<<serverPortNum<<std::endl;
 
 
 		/* Now contact the server gotten from the binder */
 		int fdClientWithServer = connection(serverIdentifier, serverPortNum);
 		if (fdClientWithServer<0) {
-			fprintf(stderr, "unable to connect with the binder\n");
+			fprintf(stderr, "librpc: unable to connect with the binder\n");
 			return -1;
 		}
 
@@ -248,12 +261,17 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
 			uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
 			uint32_t sizeAtI = getTypeSize(typeAtI);
-			std::cout<<"Length of args at i: "<<lenAtI<<std::endl;
-			std::cout<<"Size of args at i: "<<sizeAtI<<std::endl;
-			std::cout<<"Type of args at i: "<<typeAtI<<std::endl;
+			
+			if (DEBUG_PRINT_ENABLED) {
+				std::cout<<"Length of args at i: "<<lenAtI<<std::endl;
+				std::cout<<"Size of args at i: "<<sizeAtI<<std::endl;
+				std::cout<<"Type of args at i: "<<typeAtI<<std::endl;
+			}
+			
 			if (lenAtI==0) { // This argument is not an array
 				totalBytesOfArgs += sizeAtI;
 			}
+			
 			else {
 				totalBytesOfArgs += lenAtI*sizeAtI;
 			}
@@ -263,13 +281,15 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		messageLength = sizeof(messageTypeServer);
 		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0);
 		sendInt(fdClientWithServer, &messageTypeServer, messageLength, 0);
-		std::cout<<"Message sent to server: "<<messageTypeServer<<std::endl;
+		if (DEBUG_PRINT_ENABLED)
+			std::cout<<"Message sent to server: "<<messageTypeServer<<std::endl;
 
 		// Send the funcName
 		messageLength = strlen(name)+1;
 		sendInt(fdClientWithServer, &messageLength, sizeof(messageLength), 0); // It's own length
 		sendMessage(fdClientWithServer, name, messageLength, 0);
-		std::cout<<"Message sent to server: "<<name<<std::endl;
+		if (DEBUG_PRINT_ENABLED)
+			std::cout<<"Message sent to server: "<<name<<std::endl;
 
 		// Send the argTypes
 		messageLength = sizeOfargTypesArray;
@@ -283,7 +303,9 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 				justInCase+=sendLength;
 			}
 		}
-		std::cout<<"Message sent to server: "<<argTypes[0]<<std::endl;
+		
+		if (DEBUG_PRINT_ENABLED)
+			std::cout<<"Message sent to server: "<<argTypes[0]<<std::endl;
 
 		// Send the args. Each element in args one at a time
 
@@ -354,13 +376,15 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 				justInCase+=ssr;
 			}
 		}
-		std::cout<<"Message size sent: "<<ssr<<std::endl;
-		std::cout<<"Actual message size: "<<totalBytesOfArgs<<std::endl;
-		std::cout<<"Message sent to server: ";
-		for (int v=0;v<totalBytesOfArgs;v++) {
-			std::cout<<(int)*(messageArgsToServer+v)<<" ";
+		if (DEBUG_PRINT_ENABLED) {
+			std::cout<<"Message size sent: "<<ssr<<std::endl;
+			std::cout<<"Actual message size: "<<totalBytesOfArgs<<std::endl;
+			std::cout<<"Message sent to server: ";
+			for (int v=0;v<totalBytesOfArgs;v++) {
+				std::cout<<(int)*(messageArgsToServer+v)<<" ";
+			}
+			std::cout<<std::endl;
 		}
-		std::cout<<std::endl;
 
 		/* Receive response back from the Server */
 		uint32_t serverResponseLen;
@@ -410,13 +434,13 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 			receiveInt(fdClientWithServer, &serverResponseLen, sizeof(serverResponseLen), 0);
 			receiveInt(fdClientWithServer, &serverNegativeResponse, sizeof(serverNegativeResponse), 0);
 			if (serverNegativeResponse == SERVER_CANNOT_HANDLE_REQUEST) {
-				printf("Error during server function execution.\n");
+				printf("librpc: Error during server function execution.\n");
 			}
 			else if (serverNegativeResponse == SERVER_DOES_NOT_HAVE_RPC) {
-				printf("Server does not have remote procedure.\n");
+				printf("librpc: Server does not have remote procedure.\n");
 			}
 			else if (serverNegativeResponse == SERVER_IS_OVERLOADED) {
-				printf("server is currently overloaded, try again later...\n");
+				printf("librpc: Server is currently overloaded, try again later...\n");
 			}
 
 			hasFailed = 1;
@@ -431,13 +455,13 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		receiveInt(fdClientWithBinder, &binderNegativeResponse, binderResponseLen, 0);
 
 		if (binderNegativeResponse == NO_SERVER_CAN_HANDLE_REQUEST) {
-			printf("no server can handle the request\n");
+			printf("librpc: No server can handle the request\n");
 		}
 
 	}
 
 	else {
-		printf("Received nothing!\n");
+		printf("librpc: Received nothing!\n");
 	}
 	
 	return hasFailed;
@@ -488,7 +512,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	std::map<std::string, skeleton>::iterator it;
 	it = listOfRegisteredFuncArgTypesNew.find(nameArgTypesCombo);
 	if (it != listOfRegisteredFuncArgTypesNew.end()) { // It is has been registered
-		printf("binder previously registered this function and argTypes\n");
+		printf("librpc: binder previously registered this function and argTypes\n");
 		return PREVIOUSLY_REGISTERED;
 	}
 	// for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
@@ -508,21 +532,24 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
 	getServerHostName[strlen(getServerHostName)] ='\0';
 	sendMessage(fdServerWithBinder, getServerHostName, messageLength, 0);
-	std::cout<<"Message sent: "<<getServerHostName<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<getServerHostName<<std::endl;
 
 	// Send the port
 	messageLength = strlen(serverPort)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
 	serverPort[strlen(serverPort)] ='\0';
 	sendMessage(fdServerWithBinder, serverPort, messageLength, 0);
-	std::cout<<"Message sent: "<<serverPort<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<serverPort<<std::endl;
 
 	// Send the funcName
 	messageLength = strlen(name)+1;
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0); // It's own length
 	// name[strlen(name)] ='\0';
 	sendMessage(fdServerWithBinder, name, messageLength, 0);
-	std::cout<<"Message sent: "<<name<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<name<<std::endl;
 
 	// Send the argTypes
 	messageLength = sizeOfargTypesArray;
@@ -538,9 +565,12 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 			justInCase+=sendLength;
 		}
 	}
-	std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Message sent: "<<argTypesToSend[0]<<std::endl;
 
-	std::cout<<"Registration message sent to the binder"<<std::endl;
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<<"Registration message sent to the binder"<<std::endl;
+
 	/* Get the response back from the binder */ 
 	uint32_t receiveLength;
 	uint32_t receiveType;
@@ -558,18 +588,23 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 	/* Second Register Step: Associate the server skeleton with the name and list of args */
 	if (receiveType == REGISTER_SUCCESS) {
 		if (responseMessage == NEW_REGISTRATION) {
-			printf("NEW_REGISTRATION\n");
+			if (DEBUG_PRINT_ENABLED)
+				printf("NEW_REGISTRATION\n");
 
 			// Update list
 			listOfRegisteredFuncArgTypesNew.insert(std::pair<std::string, skeleton> (nameArgTypesCombo, f));
-			std::cout << "Added " << name << ": " << (void *) f << std::endl;
+			
+			if (DEBUG_PRINT_ENABLED)
+				std::cout << "Added " << name << ": " << (void *) f << std::endl;
 			// listOfRegisteredFuncArgTypesNew.push_back(nameArgTypesCombo);
 		}
 	}
 	else if (receiveType == REGISTER_FAILURE) {
-		printf("REGISTER_FAILURE\n");
+		if (DEBUG_PRINT_ENABLED)
+			printf("REGISTER_FAILURE\n");
+
 		if (responseMessage == BINDER_UNABLE_TO_REGISTER) {
-			perror("binder unable to register\n");
+			perror("librpc: unable to registe with binder\n");
 		}
 		return BINDER_UNABLE_TO_REGISTER;
 	}
@@ -583,7 +618,7 @@ int rpcExecute() { /*Jk*/
 
 	// listen on the initialized sockets
 	if (listen(fdServerWithClient, BACKLOG) == -1) {
-		fprintf(stderr, "error while trying to listen\n");
+		fprintf(stderr, "librpc: error while trying to listen in rpcExecute()\n");
 	}
 	
 	// set up for select
@@ -622,9 +657,12 @@ int rpcExecute() { /*Jk*/
 		// select() blocks until a new connection request or message on current connection
 		ret = select(fdmax+1, &read_fds, NULL, NULL, NULL);
 		if (ret ==-1) {
-			perror("error on select()'s return\n");
+			if (DEBUG_PRINT_ENABLED)
+				perror("error on select()'s return\n");
 		}
-		printf("New Connection received\n");
+		if (DEBUG_PRINT_ENABLED)
+			printf("New Connection received\n");
+
 		// Once select returns, loop through the file descriptor list
 		for (int i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &read_fds)) {
@@ -671,7 +709,9 @@ int rpcExecute() { /*Jk*/
 					int result = receiveInt(i, &messageLength, sizeof(messageLength), 0);
 
 					if (result < 0) {
-						printf("TESTTTT\n");
+						if (DEBUG_PRINT_ENABLED)
+							printf("TESTTTT\n");
+
 						close(i);
 						FD_CLR(i, &master_fd);
 						break;
@@ -681,10 +721,14 @@ int rpcExecute() { /*Jk*/
 						// Next, get the type of the incoming message
 						messageType = 0;
 						receiveInt(i, &messageType, sizeof(messageType), 0);
-						std::cout << "Received type: " << messageType << std::endl;
-						std::cout << "Received length: " << messageLength << std::endl;
+						if (DEBUG_PRINT_ENABLED) {
+							std::cout << "Received type: " << messageType << std::endl;
+							std::cout << "Received length: " << messageLength << std::endl;
+						}
 					}
-					printf("I SHOULD NOT SEE THIS\n");
+					if (DEBUG_PRINT_ENABLED)
+						printf("I SHOULD NOT SEE THIS\n");
+
 					// forward request to skeleton
 					if (messageType == EXECUTE) {
 						// message format from rpcCall
@@ -692,14 +736,16 @@ int rpcExecute() { /*Jk*/
 						receiveInt(i, &messageLength, sizeof(messageLength), 0);
 						char funcName[messageLength];
 						receiveMessage(i, funcName, messageLength, 0);
-						std::cout << "Received: " << funcName << std::endl;
+						if (DEBUG_PRINT_ENABLED)
+							std::cout << "Received: " << funcName << std::endl;
 						
 						// length, int* argTypes
 						receiveInt(i, &messageLength, sizeof(messageLength), 0);
 						char argTypesChar[messageLength];
 						receiveMessage(i, argTypesChar, messageLength, 0);
 						int* argTypes = (int*) argTypesChar;
-						std::cout << "Received: " << argTypes[0] << std::endl;
+						if (DEBUG_PRINT_ENABLED)
+							std::cout << "Received: " << argTypes[0] << std::endl;
 						
 						// convert to intermediate form to handle arbitrary length arrays
 						int argTypesToSend[messageLength/sizeof(int)];
@@ -708,14 +754,18 @@ int rpcExecute() { /*Jk*/
 						int k = 0;
 
 						while (true) {
-							std::cout << *(argTypes+k) << " ";
+							if (DEBUG_PRINT_ENABLED)
+								std::cout << *(argTypes+k) << " ";
+
 							if (*(argTypes+k) == 0) {
 								lengthOfargTypesArray = k+1;
 								break;
 							}
 							k++;
 						}
-						std::cout << std::endl;
+
+						if (DEBUG_PRINT_ENABLED)
+							std::cout << std::endl;
 
 						for (int j = 0; j < lengthOfargTypesArray; j++) {
 							int inputOutInfo = *(argTypes+j) >> 24 & 0xff; // The 1st byte from the left
@@ -741,19 +791,21 @@ int rpcExecute() { /*Jk*/
 						receiveMessage(i, argsChar, argsLength, 0);
 
 						// print out args before function call
-						std::cout << funcName << " args before function call: " << std::endl;
-						for (int j = 0; j < argsLength; j++) {
-							int curr = (unsigned char) argsChar[j];
+						if (DEBUG_PRINT_ENABLED) {
+							std::cout << funcName << " args before function call: " << std::endl;
+							for (int j = 0; j < argsLength; j++) {
+								int curr = (unsigned char) argsChar[j];
 
-							// print newline every 8 bytes
-							if (j % 8 == 0) std::cout << std::endl;
+								// print newline every 8 bytes
+								if (j % 8 == 0) std::cout << std::endl;
 
-							// pad 0 if only 1 hex character
-							if (curr < 0x10) std::cout << "0";
-							std::cout << std::hex << curr;
-							std::cout << " ";
+								// pad 0 if only 1 hex character
+								if (curr < 0x10) std::cout << "0";
+								std::cout << std::hex << curr;
+								std::cout << " ";
+							}
+							std::cout << std::endl;
 						}
-						std::cout << std::endl;
 
 						// make void* array
 						// each pointer needs to point at the start of memory of each argument
@@ -767,7 +819,8 @@ int rpcExecute() { /*Jk*/
 						for (int j = 0; j < lengthOfargTypesArray - 1; j++) {
 							args[j] = ((char *) &argsChar) + offset;
 
-							std::cout << "void* args[" << j << "]: " << args[j] << std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout << "void* args[" << j << "]: " << args[j] << std::endl;
 
 							uint32_t lenAtJ = *(argTypes + j) & 0xffff; // Get only the rightmost 16 bits
 							uint32_t typeAtJ = *(argTypes + j) >> 16 & 0xff; // To get the 2nd byte from the left
@@ -782,7 +835,8 @@ int rpcExecute() { /*Jk*/
 						}
 						
 						std::string key = getUniqueFunctionKey(funcName, argTypesToSend);
-						std::cout << "Received request for: " << key << std::endl;
+						if (DEBUG_PRINT_ENABLED)
+							std::cout << "Received request for: " << key << std::endl;
 						
 						// check that function exists on the server
 						uint32_t result = EXECUTE_FAILURE;
@@ -791,7 +845,9 @@ int rpcExecute() { /*Jk*/
 						it = listOfRegisteredFuncArgTypesNew.find(key);
 						if (it != listOfRegisteredFuncArgTypesNew.end()) {
 							skeleton skel = listOfRegisteredFuncArgTypesNew.at(key);
-							std::cout << "Found function pointer for: " << key << " : " << (void *) skel << std::endl;
+							
+							if (DEBUG_PRINT_ENABLED)
+								std::cout << "Found function pointer for: " << key << " : " << (void *) skel << std::endl;
 							
 							// skeleton returns 0, success
 							// skeleton returns non-zero, failure
@@ -815,22 +871,24 @@ int rpcExecute() { /*Jk*/
 									offset += lenAtJ * sizeAtJ;
 								}
 							}
+							
+							if (DEBUG_PRINT_ENABLED) {
+								// print out args after function call
+								std::cout << funcName << " after function call: " << std::endl;
+								for (int j = 0; j < argsLength; j++) {
+									int curr = (unsigned char) argsChar[j];
 
-							// print out args after function call
-							std::cout << funcName << " after function call: " << std::endl;
-							for (int j = 0; j < argsLength; j++) {
-								int curr = (unsigned char) argsChar[j];
+									// print newline every 8 bytes
+									if (j % 8 == 0) std::cout << std::endl;
 
-								// print newline every 8 bytes
-								if (j % 8 == 0) std::cout << std::endl;
-
-								// pad 0 if only 1 hex character
-								if (curr < 0x10) std::cout << "0";
-								std::cout << std::hex << curr;
-								std::cout << " ";
-								
+									// pad 0 if only 1 hex character
+									if (curr < 0x10) std::cout << "0";
+									std::cout << std::hex << curr;
+									std::cout << " ";
+									
+								}
+								std::cout << std::endl;
 							}
-							std::cout << std::endl;
 
 							// reply EXECUTE_SUCCESS or EXECUTE_FAILURE depending on result
 							messageLength = sizeof(result);
@@ -883,7 +941,7 @@ int rpcTerminate() { /*Jk*/
 		fdClientWithBinder = connection(binderIP, binderPort);
 	}
 	if (fdClientWithBinder < 0) {
-		fprintf(stderr, "Unable to connect to binder\n");
+		fprintf(stderr, "librpc: Unable to connect to binder in rpcTerminate()\n");
 		return -1;
 	}
 
@@ -898,4 +956,3 @@ int rpcTerminate() { /*Jk*/
 
 	return 0;
 }
-// length/type/message

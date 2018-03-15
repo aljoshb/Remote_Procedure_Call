@@ -52,7 +52,7 @@ int main() {
 	/* Get the server address information and pass it to the socket function */
 	error = getaddrinfo(NULL, "0", &hints, &res);
 	if (error) {
-	    fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(error));
+	    fprintf(stderr, "binder: getaddrinfo error: %s\n", gai_strerror(error));
 	    exit(1);
 	}
 
@@ -63,14 +63,14 @@ int main() {
 		// Create the socket
 		binderSocket = socket(goodres->ai_family, goodres->ai_socktype, goodres->ai_protocol);
 		if (binderSocket<0) {
-			perror("error on creating a binder socket");
+			perror("binder: error on creating a binder socket");
 			continue;
 		}
 
 		// Bind the socket
 		if (bind(binderSocket, goodres->ai_addr, goodres->ai_addrlen) == -1) {
 			close(binderSocket);
-			perror("error on binding the binder");
+			perror("binder: error on binding the binder");
 			continue;
 		}
 		break;
@@ -81,13 +81,15 @@ int main() {
 	if (goodres == NULL) {
 		fprintf(stderr, "failed to bind\n");
 	}
-	std::cout<<"Binder Listening...." <<std::endl;
+	
+	if (DEBUG_PRINT_ENABLED)
+		std::cout<< "binder: Listening...." <<std::endl;
 	/* Free the res linked list structure. Don't need it anymore */
 	freeaddrinfo(res);
 
 	/* Listen for connections */
 	if (listen(binderSocket, BACKLOG) == -1) {
-		fprintf(stderr, "error while trying to listen\n");
+		fprintf(stderr, "binder: error while trying to listen\n");
 	}
 
 	/* Get the Binder's port number and IP */
@@ -169,8 +171,9 @@ int main() {
 
 			if (FD_ISSET(i, &read_fds)) {
 				if (i == binderSocket) { // Received a new connection request
+					if (DEBUG_PRINT_ENABLED)
+						std::cout<<"Binder Accepted new connection...." <<std::endl;
 
-					std::cout<<"Binder Accepted new connection...." <<std::endl;
 					addrlen = sizeof remoteaddr;
 					newfd = accept(binderSocket, (struct sockaddr *)&remoteaddr, &addrlen);
 					if (newfd == -1) {
@@ -187,7 +190,8 @@ int main() {
 					}
 				}
 				else { // Received data from an existing connection
-					std::cout<<"Binder Accepted Data...." <<std::endl;
+					if (DEBUG_PRINT_ENABLED)
+						std::cout<<"Binder Accepted Data...." <<std::endl;
 					// First, get the length of the incoming message
 					int retL=receiveInt(i, &messageLength, sizeof(messageLength), 0);
 					if (retL==-1) {
@@ -195,18 +199,22 @@ int main() {
 						FD_CLR(i, &master_fd);
 						break;
 					}
-					std::cout<<"Message length: " <<messageLength<<std::endl;
+					if (DEBUG_PRINT_ENABLED)
+						std::cout<<"Message length: " <<messageLength<<std::endl;
 					// Allocate the appropriate memory and get the message
 					// char *message;
 					// message = (char*) malloc (messageLength);
 
 					// Next, get the type of the incoming message
 					receiveInt(i, &messageType, sizeof(messageType), 0);
-					std::cout<<"Message Type: " <<messageType<<std::endl;
+					if (DEBUG_PRINT_ENABLED)
+						std::cout<<"Message Type: " <<messageType<<std::endl;
 
 					// TERMINATION
 					if (messageType == TERMINATE) {
-						std::cout<<"Binder Received termination request...." <<std::endl;
+						if (DEBUG_PRINT_ENABLED)
+							std::cout<<"Binder Received termination request...." <<std::endl;
+
 						continueRunning = 0;
 
 						// Inform all the servers
@@ -251,8 +259,8 @@ int main() {
 								// Not added yet
 								serverFds.push_back(i);
 							}
-
-							std::cout<<"Binder Received registration request...." <<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Binder Received registration request...." <<std::endl;
 
 							// Set the server ip, port, function name and argTypes array 
 							
@@ -261,21 +269,24 @@ int main() {
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char* newServerHostName=(char*)malloc(messageLength);
 							receiveMessage(i, newServerHostName, messageLength, 0);
-							std::cout<<"Message received: "<<newServerHostName<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Message received: "<<newServerHostName<<std::endl;
 
 							// Get the port
 							// messageLength = SERVERPORT;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char* newServerPort=(char*)malloc(messageLength);
 							receiveMessage(i, newServerPort, messageLength, 0);
-							std::cout<<"Message received: "<<newServerPort<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Message received: "<<newServerPort<<std::endl;
 
 							// Get the funcName
 							// messageLength = FUNCNAMELENGTH;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char *funcName = (char*)malloc(messageLength);
 							receiveMessage(i, funcName, messageLength, 0);
-							std::cout<<"Message received: "<<funcName<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Message received: "<<funcName<<std::endl;
 
 							// Get the argTypes
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
@@ -291,12 +302,13 @@ int main() {
 								}
 							}
 
-
-							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Message received: "<<argTypes[0]<<std::endl;
 
 							// Get the potential key
 							std::string keyFuncArgTypes = getUniqueFunctionKey(funcName, argTypes);
-							std::cout<<"Key for new registration: "<<keyFuncArgTypes<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Key for new registration: "<<keyFuncArgTypes<<std::endl;
 
 							char *serverIden = (char*)malloc(strlen(newServerHostName)+strlen(newServerPort)+2);
 							memset(serverIden,0,strlen(newServerHostName)+strlen(newServerPort)+2);
@@ -305,7 +317,8 @@ int main() {
 							memcpy(serverIden+strlen(newServerHostName), delimiter, 1); // Divide the server ip and port by ';'
 							memcpy(serverIden+strlen(newServerHostName)+1, newServerPort, strlen(newServerPort));
 							std::string serverLocValue(serverIden);
-							std::cout<<"new server value: "<<serverLocValue<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"new server value: "<<serverLocValue<<std::endl;
 
 							int added = -1;
 
@@ -370,14 +383,16 @@ int main() {
 
 						}
 						else if (messageType == LOC_REQUEST) {
-							std::cout<<"Binder Received location request...." <<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Binder Received location request...." <<std::endl;
 
 							// Get the funcName
 							// messageLength = FUNCNAMELENGTH;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char *funcName = (char*)malloc(messageLength);
 							receiveMessage(i, funcName, messageLength, 0);
-							std::cout<<"Message received: "<<funcName<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Message received: "<<funcName<<std::endl;
 
 							// Get the argTypes
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
@@ -393,12 +408,13 @@ int main() {
 								}
 							}
 
-
-							std::cout<<"Message received: "<<argTypes[0]<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Message received: "<<argTypes[0]<<std::endl;
 
 							// Get the potential key
 							std::string keyFuncArgTypes = getUniqueFunctionKey(funcName, argTypes);
-							std::cout<<"Key for new registration: "<<keyFuncArgTypes<<std::endl;
+							if (DEBUG_PRINT_ENABLED)
+								std::cout<<"Key for new registration: "<<keyFuncArgTypes<<std::endl;
 
 							uint32_t responseLength;
 							uint32_t responseType;
@@ -416,8 +432,10 @@ int main() {
 								std::string serverIP = serverIdAndPort.substr(0, serverIdAndPort.find(delimiter));
 								std::string serverPort = serverIdAndPort.substr(serverIdAndPort.find(delimiter)+1, serverIdAndPort.length());
 
-								std::cout<<serverIP<<std::endl;
-								std::cout<<serverPort<<std::endl;
+								if (DEBUG_PRINT_ENABLED) {
+									std::cout<<serverIP<<std::endl;
+									std::cout<<serverPort<<std::endl;
+								}
 
 								// std::string str = "string";
 								// char *cstr = new char[str.length() + 1];

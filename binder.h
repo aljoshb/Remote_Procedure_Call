@@ -21,6 +21,10 @@ extern "C" {
 // 	skeleton f;
 // };
 
+// message printing toggles
+#define DEBUG_PRINT_ENABLED 0
+#define ERROR_PRINT_ENABLED 0
+
 /* Message types */
 #define REGISTER 			1
 #define REGISTER_SUCCESS	2
