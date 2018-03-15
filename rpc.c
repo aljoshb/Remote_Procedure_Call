@@ -625,7 +625,7 @@ int rpcExecute() { /*Jk*/
 		if (ret ==-1) {
 			perror("error on select()'s return\n");
 		}
-
+		printf("New Connection received\n");
 		// Once select returns, loop through the file descriptor list
 		for (int i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &read_fds)) {
@@ -672,6 +672,7 @@ int rpcExecute() { /*Jk*/
 					int result = receiveInt(i, &messageLength, sizeof(messageLength), 0);
 
 					if (result < 0) {
+						printf("TESTTTT\n");
 						close(i);
 						FD_CLR(i, &master_fd);
 						break;
@@ -684,7 +685,7 @@ int rpcExecute() { /*Jk*/
 						std::cout << "Received type: " << messageType << std::endl;
 						std::cout << "Received length: " << messageLength << std::endl;
 					}
-
+					printf("I SHOULD NOT SEE THIS\n");
 					// forward request to skeleton
 					if (messageType == EXECUTE) {
 						// message format from rpcCall
