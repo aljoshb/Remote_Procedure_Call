@@ -28,10 +28,10 @@ As stated, the database maps a function (i.e. key="funcName"+string(argTypes)) t
 Below is a sample of what entries will look like in the database:
 
 
-			key 			|       		Value
+			    key 			|       		Value
 
-			"f034789921567"		{"server1ip;server1port", "server5ip;server5port", "server4ip;server4port"}
-			"f1347899215"		{"server1ip;server1port", "server2ip;server2port",  "server3ip;server3port"}
+			"f034789921567"		     {"server1ip;server1port", "server5ip;server5port", "server4ip;server4port"}
+			"f1347899215"		     {"server1ip;server1port", "server2ip;server2port",  "server3ip;server3port"}
 
 
 ### Managing Round-Robin Scheduling
@@ -46,10 +46,10 @@ Below is a simulation of how the round-robin approach works:
 			4. The front of the queue for function "f034789921567" (i.e. "server1ip;server1port") is popped and pushed to the back of the queue
 			5. At the end of the process the database now has the form:
 
-			key 			|       		Value
+			    key 			|       		Value
 
-			"f034789921567"		{"server5ip;server5port", "server4ip;server4port", "server1ip;server1port"}
-			"f1347899215"		{"server2ip;server2port", "server1ip;server1port", "server3ip;server3port"} 
+			"f034789921567"		      {"server5ip;server5port", "server4ip;server4port", "server1ip;server1port"}
+			"f1347899215"		      {"server2ip;server2port", "server1ip;server1port", "server3ip;server3port"} 
 
 That is, server1 has been moved to the back of the list of servers that have function "f034789921567". This way, we guarantee that server 1 will not be called again to service a request for function "f034789921567" until all the other servers ("server5ip;server5port" & "server4ip;server4port") that can service a request for "f034789921567" have also been called.
 
