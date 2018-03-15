@@ -563,7 +563,8 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 			printf("NEW_REGISTRATION\n");
 
 			// Update list
-			listOfRegisteredFuncArgTypesNew[nameArgTypesCombo] = f;
+			listOfRegisteredFuncArgTypesNew.insert(std::pair<std::string, skeleton> (nameArgTypesCombo, f));
+			std::cout << "Added " << name << ": " << (void *) f << std::endl;
 			// listOfRegisteredFuncArgTypesNew.push_back(nameArgTypesCombo);
 		}
 	}
@@ -739,6 +740,15 @@ int rpcExecute() { /*Jk*/
 						char argsChar[messageLength];
 						receiveMessage(i, argsChar, messageLength, 0);
 						void** args = (void**) argsChar;
+
+						std::cout << funcName << " args: " << std::endl;
+						for (int j = 0; j < messageLength; j++) {
+							int curr = (unsigned char) argsChar[j];
+
+							std::cout << curr;
+							std::cout << " ";
+						}
+						std::cout << std::endl;
 						
 						std::string key = getUniqueFunctionKey(funcName, argTypesToSend);
 						std::cout << "Received request for: " << key << std::endl;
@@ -747,10 +757,10 @@ int rpcExecute() { /*Jk*/
 						std::map<std::string, skeleton>::iterator it;
 						it = listOfRegisteredFuncArgTypesNew.find(key);
 						if (it != listOfRegisteredFuncArgTypesNew.end()) {
-							std::cout << "Found function pointer for: " << key << std::endl;
-
-							skeleton skel = listOfRegisteredFuncArgTypesNew[key];
-							// (*skel) (argTypes, args);
+							skeleton skel = listOfRegisteredFuncArgTypesNew.at(key);
+							std::cout << "Found function pointer for: " << key << " : " << (void *) skel << std::endl;
+							
+							// int result = (*skel) (argTypes, args);
 						}
 
 						else {
