@@ -14,6 +14,13 @@ The file communication_function.c (and its header file: communication_function.h
 
 ### Marshalling/Unmarshalling of Data
 
+To send the arguments from the client to the server, the areas of memory that contained each argument in the `void** args` array were marshalled into a `char` array representing the binary data of all the aguments concatenated together. This is possible from the `void** args` array containing the starting address of each of its arguments, and we can determine how much memory to copy for each element of the `void** args` array from the metadata contained in `int* argTypes`. 
+
+On the server side, the arguments are contained in a contiguous block of memory. Again, from the  sizes of each argument contained within the `int* argTypes` array, we can reconstruct the pointers of each argument to a copy of `void** args` residing on the server by adding an offset of the size of each of the arguments. 
+
+The values of all arguments in the `void** args` array are copied back into contiguous `char` array in the event that a server function allocated dynamic memory and did not operate directly on the `void** args` array.
+
+Finally, when the client receives the contiguous block of memory back in the form of a `char` array, it places each argument received from the server back into its original memory location. This has the end effect as if the client called the function locally.
 
 ### Structure Binder Database and Handling of Function Overloading
 

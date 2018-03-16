@@ -41,6 +41,69 @@ int fdClientWithBinder = -1;
 // std::vector<std::string> listOfRegisteredFuncArgTypesNew;
 std::map<std::string, skeleton> listOfRegisteredFuncArgTypesNew;
 
+void handleSkeleton(int i, int* argTypes, std::string funcName, int lengthOfargTypesArray, char* argsChar, void** args, uint32_t argsLength, skeleton skel) {
+	// skeleton returns 0, success
+	// skeleton returns non-zero, failure
+	uint32_t result = (*skel) (argTypes, args) == 0 ? EXECUTE_SUCCESS : EXECUTE_FAILURE;
+	
+	// copy the server's local memory to be sent to the client
+	int offset = 0;
+	// lengthOfargTypesArray - 1 since the last element is 0
+	for (int j = 0; j < lengthOfargTypesArray - 1; j++) {
+		uint32_t lenAtJ = *(argTypes + j) & 0xffff; // Get only the rightmost 16 bits
+		uint32_t typeAtJ = *(argTypes + j) >> 16 & 0xff; // To get the 2nd byte from the left
+		uint32_t sizeAtJ = getTypeSize(typeAtJ);
+
+		if (lenAtJ == 0) { // This argument is not an array
+			memcpy(argsChar + offset, *(args + j), sizeAtJ);
+
+			offset += sizeAtJ;
+		}
+		else {
+			memcpy(argsChar + offset, *(args + j), lenAtJ*sizeAtJ);
+			offset += lenAtJ * sizeAtJ;
+		}
+	}
+	
+	if (DEBUG_PRINT_ENABLED) {
+		// print out args after function call
+		std::cout << funcName << " after function call: " << std::endl;
+		for (int j = 0; j < argsLength; j++) {
+			int curr = (unsigned char) argsChar[j];
+
+			// print newline every 8 bytes
+			if (j % 8 == 0) std::cout << std::endl;
+
+			// pad 0 if only 1 hex character
+			if (curr < 0x10) std::cout << "0";
+			std::cout << std::hex << curr;
+			std::cout << " ";
+			
+		}
+		std::cout << std::endl;
+	}
+
+	// reply EXECUTE_SUCCESS or EXECUTE_FAILURE depending on result
+	uint32_t messageLength = sizeof(result);
+	sendInt(i, &messageLength, sizeof(messageLength), 0);
+	sendInt(i, &result, sizeof(result), 0);
+
+	if (result == EXECUTE_SUCCESS) {
+		// send args
+		sendInt(i, &argsLength, sizeof(argsLength), 0);
+		sendMessage(i, argsChar, argsLength, 0);
+	}
+
+	else {
+		// send reasonCode
+		uint32_t reasonCode = SERVER_CANNOT_HANDLE_REQUEST;
+		messageLength = sizeof(reasonCode);
+
+		sendInt(i, &messageLength, sizeof(messageLength), 0);
+		sendInt(i, &reasonCode, sizeof(reasonCode), 0);
+	}
+}
+
 int rpcInit() { /*Josh*/
 	
 	/* First Init Step: Server socket for accepting connections from clients */
@@ -862,66 +925,8 @@ int rpcExecute() { /*Jk*/
 							if (DEBUG_PRINT_ENABLED)
 								std::cout << "Found function pointer for: " << key << " : " << (void *) skel << std::endl;
 							
-							// skeleton returns 0, success
-							// skeleton returns non-zero, failure
-							result = (*skel) (argTypes, args) == 0 ? EXECUTE_SUCCESS : EXECUTE_FAILURE;
-							
-							// copy the server's local memory to be sent to the client
-							offset = 0;
-							// lengthOfargTypesArray - 1 since the last element is 0
-							for (int j = 0; j < lengthOfargTypesArray - 1; j++) {
-								uint32_t lenAtJ = *(argTypes + j) & 0xffff; // Get only the rightmost 16 bits
-								uint32_t typeAtJ = *(argTypes + j) >> 16 & 0xff; // To get the 2nd byte from the left
-								uint32_t sizeAtJ = getTypeSize(typeAtJ);
-
-								if (lenAtJ == 0) { // This argument is not an array
-									memcpy(argsChar + offset, *(args + j), sizeAtJ);
-
-									offset += sizeAtJ;
-								}
-								else {
-									memcpy(argsChar + offset, *(args + j), lenAtJ*sizeAtJ);
-									offset += lenAtJ * sizeAtJ;
-								}
-							}
-							
-							if (DEBUG_PRINT_ENABLED) {
-								// print out args after function call
-								std::cout << funcName << " after function call: " << std::endl;
-								for (int j = 0; j < argsLength; j++) {
-									int curr = (unsigned char) argsChar[j];
-
-									// print newline every 8 bytes
-									if (j % 8 == 0) std::cout << std::endl;
-
-									// pad 0 if only 1 hex character
-									if (curr < 0x10) std::cout << "0";
-									std::cout << std::hex << curr;
-									std::cout << " ";
-									
-								}
-								std::cout << std::endl;
-							}
-
-							// reply EXECUTE_SUCCESS or EXECUTE_FAILURE depending on result
-							messageLength = sizeof(result);
-							sendInt(i, &messageLength, sizeof(messageLength), 0);
-							sendInt(i, &result, sizeof(result), 0);
-
-							if (result == EXECUTE_SUCCESS) {
-								// send args
-								sendInt(i, &argsLength, sizeof(argsLength), 0);
-								sendMessage(i, argsChar, argsLength, 0);
-							}
-
-							else {
-								// send reasonCode
-								uint32_t reasonCode = SERVER_CANNOT_HANDLE_REQUEST;
-								messageLength = sizeof(reasonCode);
-
-								sendInt(i, &messageLength, sizeof(messageLength), 0);
-								sendInt(i, &reasonCode, sizeof(reasonCode), 0);
-							}
+							std::string funcNameCpp = funcName;
+							handleSkeleton(i, argTypes, funcNameCpp, lengthOfargTypesArray, argsChar, args, argsLength, skel);
 						}
 
 						else {
