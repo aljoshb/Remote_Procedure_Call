@@ -18,7 +18,6 @@
 #include <queue>
 
 #include "rpc.h"
-#include "binder.h"
 #include "communication_functions.h"
 
 #define BACKLOG 100
@@ -141,21 +140,11 @@ int main() {
 
 	/* Dictionary and vector to database */
 	std::map<std::string, std::queue<std::string> > binderDatabaseStr2;
-	// std::map<int, std::vector<std::string> > binderDatabaseStr;
-	//std::map<int, std::vector<std::string>::iterator dataBaseIterator;
 
 	int continueRunning = 1;
 
 	/* Store the servers file descriptors */
 	std::vector<int> serverFds;
-
-	/* Dictionary to store int to funcArgTypes mapping */
-	// std::map<int, funcStruct> funcToMap;
-
-	/* Dictionary to store the server info */
-	// std::map<std::string, serverInfo> serverMap;
-	
-	// std::map<std::string, std::string> serverMapStr;
 
 	/* Binder runs forever, accepting connections and processing data until a termination message */
 	while (continueRunning == 1) {
@@ -220,18 +209,6 @@ int main() {
 
 						continueRunning = 0;
 
-						// Inform all the servers
-						// for (int i=0; i<=fdmax; i++) { // Send to both server and client. Client will ignore it.
-						// 	if (FD_ISSET(i, &read_fds) && i != binderSocket) { // Wrong, only send it to the servers on the dictionary
-								
-						// 		// Send the length
-						// 		sendInt(i, &messageLength, sizeof(messageLength), 0);
-
-						// 		// Send the message (Just the type: TERMINATE)
-						// 		sendInt(i, &messageType, sizeof(messageType), 0);
-
-						// 	}
-						// }
 						for (int fd=0; fd<serverFds.size(); fd++) { // Send to the servers
 
 							// Send the length
@@ -440,9 +417,6 @@ int main() {
 									std::cout<<serverPort<<std::endl;
 								}
 
-								// std::string str = "string";
-								// char *cstr = new char[str.length() + 1];
-								// strcpy(cstr, str.c_str());
 								char *serverIPchar = new char[serverIP.length() + 1];
 								strcpy(serverIPchar, serverIP.c_str());
 								char *serverPortchar = new char[serverPort.length() + 1];
@@ -493,21 +467,14 @@ int main() {
 								// Send the message
 								sendInt(i, &responseMessage, sizeof(responseMessage), 0);
 							}
-							// Free
 							free(funcName);
 							free(argTypes);
-							//free(funcArgTypesToFind);
 						}
 
-					}	
-
-					// free(message);
+					}
 				}
 			}
 		}
-
 	}
-
-	// Close binder socket
 	close(binderSocket);
 }

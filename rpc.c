@@ -17,7 +17,6 @@
 #include <iostream>
 
 #include "rpc.h"
-#include "binder.h"
 #include "communication_functions.h"
 
 /* Server socket file descriptors with the client and binder */
@@ -31,14 +30,6 @@ char* serverPort = (char*)malloc(SERVERPORT);
 /* Client socket file descriptors with the binder */
 int fdClientWithBinder = -1;
 
-/* Store the registered function and its skeleton */
-// struct funcStructServer {
-// 	char* funcName;
-// 	int* argTypes;
-// 	skeleton f;
-// };
-
-// std::vector<std::string> listOfRegisteredFuncArgTypesNew;
 std::map<std::string, skeleton> listOfRegisteredFuncArgTypesNew;
 
 void handleSkeleton(int i, int* argTypes, std::string funcName, int lengthOfargTypesArray, char* argsChar, void** args, uint32_t argsLength, skeleton skel) {
@@ -375,45 +366,6 @@ int rpcCall(char* name, int* argTypes, void** args) { /*Josh*/
 		if (DEBUG_PRINT_ENABLED)
 			std::cout<<"Message sent to server: "<<argTypes[0]<<std::endl;
 
-		// Send the args. Each element in args one at a time
-
-		// First send the total expected length of the args array to the server
-		// uint32_t lenArgs = (uint32_t)lengthOfargArray;
-		// sendInt(fdClientWithServer, &lenArgs, sizeof(lenArgs), 0);
-
-		// // Then send each element of **args individually
-		// for (int i=0; i<lengthOfargArray; i++) {
-		// 	uint32_t lenAtI = *(argTypes+i) & 0xffff; // Get only the rightmost 16 bits
-		// 	uint32_t typeAtI = *(argTypes+i) >> 16 & 0xff; // To get the 2nd byte from the left
-		// 	uint32_t sizeAtI = getTypeSize(typeAtI);
-
-		// 	if (lenAtI==0) { // This argument is not an array
-
-		// 		// Send its length
-		// 		messageLength = sizeAtI;
-		// 		sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
-
-		// 		// Send its Type
-		// 		sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
-
-		// 		// Send the actual scalar
-		// 		sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
-				
-		// 	}
-		// 	else {
-
-		// 		// Send its length
-		// 		messageLength = lenAtI*sizeAtI;
-		// 		sendInt(fdClientWithServer, &lenAtI, sizeof(messageLength), 0);
-
-		// 		// Send its Type
-		// 		sendInt(fdClientWithServer, &typeAtI, sizeof(typeAtI), 0);
-
-		// 		// Send the actual scalar
-		// 		sendAny(fdClientWithServer, *(args+i), messageLength, 0, typeAtI, lenAtI);
-				
-		// 	}
-		// }
 		//Create message to send to the server received from binder
 		unsigned char* messageArgsToServer = (unsigned char*)malloc(totalBytesOfArgs);
 		int lastCopied=0;
@@ -589,13 +541,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) { /*Josh*/
 			printf("librpc: binder previously registered this function and argTypes\n");
 		return PREVIOUSLY_REGISTERED;
 	}
-	// for (int i=0;i<listOfRegisteredFuncArgTypesNew.size();i++) {
-	// 	if ((listOfRegisteredFuncArgTypesNew[i]).compare(nameArgTypesCombo) == 0) {
-	// 		printf("binder previously registered this function and argTypes\n");
-	// 		return PREVIOUSLY_REGISTERED;
-	// 	}
-	// }
-
+	
 	// Send the type
 	messageLength = sizeof(messageType);
 	sendInt(fdServerWithBinder, &messageLength, sizeof(messageLength), 0);
