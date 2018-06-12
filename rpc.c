@@ -32,13 +32,18 @@ int fdClientWithBinder = -1;
 
 std::map<std::string, skeleton> listOfRegisteredFuncArgTypesNew;
 
-void handleSkeleton(int i, int* argTypes, std::string funcName, int lengthOfargTypesArray, char* argsChar, void** args, uint32_t argsLength, skeleton skel) {
-	// skeleton returns 0, success
-	// skeleton returns non-zero, failure
+void handleSkeleton(int i, int* argTypes, 
+					std::string funcName, 
+					int lengthOfargTypesArray, 
+					char* argsChar, void** args, 
+					uint32_t argsLength, skeleton skel) {
+	
+	// skeleton returns 0, success and non-zero, failure
 	uint32_t result = (*skel) (argTypes, args) == 0 ? EXECUTE_SUCCESS : EXECUTE_FAILURE;
 	
 	// copy the server's local memory to be sent to the client
 	int offset = 0;
+	
 	// lengthOfargTypesArray - 1 since the last element is 0
 	for (int j = 0; j < lengthOfargTypesArray - 1; j++) {
 		uint32_t lenAtJ = *(argTypes + j) & 0xffff; // Get only the rightmost 16 bits
@@ -57,6 +62,7 @@ void handleSkeleton(int i, int* argTypes, std::string funcName, int lengthOfargT
 	}
 	
 	if (DEBUG_PRINT_ENABLED) {
+		
 		// print out args after function call
 		std::cout << funcName << " after function call: " << std::endl;
 		for (int j = 0; j < argsLength; j++) {
@@ -95,7 +101,7 @@ void handleSkeleton(int i, int* argTypes, std::string funcName, int lengthOfargT
 	}
 }
 
-int rpcInit() { /*Josh*/
+int rpcInit() {
 	
 	/* First Init Step: Server socket for accepting connections from clients */
 

@@ -193,9 +193,6 @@ int main() {
 					}
 					if (DEBUG_PRINT_ENABLED)
 						std::cout<<"Message length: " <<messageLength<<std::endl;
-					// Allocate the appropriate memory and get the message
-					// char *message;
-					// message = (char*) malloc (messageLength);
 
 					// Next, get the type of the incoming message
 					receiveInt(i, &messageType, sizeof(messageType), 0);
@@ -241,11 +238,8 @@ int main() {
 							}
 							if (DEBUG_PRINT_ENABLED)
 								std::cout<<"Binder Received registration request...." <<std::endl;
-
-							// Set the server ip, port, function name and argTypes array 
 							
 							// Get the serveridentifier
-							// messageLength = SERVERIP;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char* newServerHostName=(char*)malloc(messageLength);
 							receiveMessage(i, newServerHostName, messageLength, 0);
@@ -253,7 +247,6 @@ int main() {
 								std::cout<<"Message received: "<<newServerHostName<<std::endl;
 
 							// Get the port
-							// messageLength = SERVERPORT;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char* newServerPort=(char*)malloc(messageLength);
 							receiveMessage(i, newServerPort, messageLength, 0);
@@ -261,7 +254,6 @@ int main() {
 								std::cout<<"Message received: "<<newServerPort<<std::endl;
 
 							// Get the funcName
-							// messageLength = FUNCNAMELENGTH;
 							receiveInt(i, &messageLength, sizeof(messageLength), 0);
 							char *funcName = (char*)malloc(messageLength);
 							receiveMessage(i, funcName, messageLength, 0);

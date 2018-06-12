@@ -9,7 +9,7 @@ The following subsections will give a detailed explanation of the reasoning behi
 
 ### communication_function.c and communication_function.h
 
-The file communication_function.c (and its header file: communication_function.h) contains some of the key functions that were used during the completion of this assignment. In this file, the sending and receiving functions were implemented. Specifically, two types of sending and receiving functions were implemented, one for sending and receiving integers (such as the length and types of a message: sendInt() and receiveInt()) and the other for sending and receiving the actual messages stored in char arrays. Also, this file contains a function (connection()) which is used to make a socket connection to a known machine address and port.
+The file communication_function.c (and its header file: communication_function.h) contains some of the key functions that were used during the completion of this project. In this file, the sending and receiving functions were implemented. Specifically, two types of sending and receiving functions were implemented, one for sending and receiving integers (such as the length and types of a message: sendInt() and receiveInt()) and the other for sending and receiving the actual messages stored in char arrays. Also, this file contains a function (connection()) which is used to make a socket connection to a known machine address and port.
 
 
 ### Marshalling/Unmarshalling of Data
@@ -121,12 +121,3 @@ Below are the follow up messages and warning messages and codes that this system
 
 The binder responds to the server with a follow up of NEW_REGISTRATION as part of the REGISTER_SUCCESS message that it sends to the server in the event of a successful registration. The rpc library returns a warning of PREVIOUSLY_REGISTERED to the server in the event that the server tries to re-register a function it has already sucdessfully registered in the past.
 
-
-## Functions Not Implemented
-
-All required functions were implemented.
-
-
-## Advanced Enhancement
-
-There were no advanced enhancements implemented for this project.

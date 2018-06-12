@@ -1,12 +1,10 @@
-# CS 454/654 Assignment 3
+# Introduction
 
-## Introduction
-
-This assignment was completed to meet the requirements of CS454/654. The purpose of this assignment is to implement a crude version of Remote Procedure Call (RPC).
+The purpose of this project is to implement a crude version of Remote Procedure Call (RPC). Refer to the System manual in this repo for a detailed breakdown of this project and the reasons behind the design decisions.
 
 ## Running the application 
 
-To run this application, follow this procedure in the command line (terminal):
+To run this application, clone this repo, cd into the directory and follow this procedure in your terminal:
 
 				$ make
 				$ g++ -L. client.o -lrpc -o client
@@ -25,8 +23,8 @@ Finally, run the client and server files as follows:
 
 ## Group Members
 
-- `jb2alawo` Joshua Alawode 
-- `j327liu` JK Liu
+- Joshua Alawode 
+- JK Liu
 
 ## Reference
 
