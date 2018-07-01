@@ -21,7 +21,7 @@ Finally, run the client and server files as follows:
 				$ ./server
 				$ ./client
 
-## Group Members
+## Collaborators
 
 - Joshua Alawode 
 - JK Liu
